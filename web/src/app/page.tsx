@@ -76,6 +76,8 @@ export default function Home() {
   const [draft, setDraft] = useState<Metric>(blank);
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [activeNav, setActiveNav] = useState("운영");
+  const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const now = new Date();
   const [month, setMonth] = useState(
     new Date(now.getFullYear(), now.getMonth(), 1),
@@ -307,32 +309,77 @@ export default function Home() {
     );
   return (
     <main className="min-h-screen bg-[#f6f7f4] text-[#1c2720]">
-      <header className="border-b border-[#e2e6df] bg-white px-6 py-5 lg:px-10">
-        <div className="mx-auto flex max-w-[1560px] items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#246b45] text-lg text-white">
+      <header className="sticky top-0 z-30 border-b border-[#e7e9e5] bg-white/95 px-5 backdrop-blur lg:px-8">
+        <div className="mx-auto flex h-16 max-w-[1680px] items-center gap-7">
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#1f6a46] text-sm font-bold text-white shadow-sm">
               C
             </div>
-            <div>
-              <p className="text-sm font-semibold">채움영어학원 · 풍무캠퍼스</p>
-              <p className="text-xs text-[#728078]">마케팅 운영 시트</p>
+            <div className="leading-tight">
+              <p className="text-sm font-bold tracking-[-0.02em]">
+                채움 마케팅
+              </p>
+              <p className="text-[11px] text-[#7b867e]">풍무캠퍼스</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              className="rounded-lg border border-[#d8ded7] px-3 py-2 text-sm"
-              onClick={() => openPrintableReport(reportInput())}
-            >
-              PDF 보고서
+          <div className="hidden h-6 w-px bg-[#e2e6df] lg:block" />
+          <nav
+            className="flex h-full items-center gap-1"
+            aria-label="주요 메뉴"
+          >
+            {["대시보드", "운영", "콘텐츠", "이벤트", "비용"].map((item) => (
+              <button
+                key={item}
+                onClick={() => {
+                  setActiveNav(item);
+                  setReportMenuOpen(false);
+                }}
+                className={`h-full border-b-2 px-3 text-sm font-medium transition ${activeNav === item ? "border-[#1f6a46] text-[#19593a]" : "border-transparent text-[#657168] hover:text-[#1c2720]"}`}
+              >
+                {item}
+              </button>
+            ))}
+            <div className="relative h-full">
+              <button
+                onClick={() => {
+                  setActiveNav("리포트");
+                  setReportMenuOpen((open) => !open);
+                }}
+                className={`flex h-full items-center gap-1 border-b-2 px-3 text-sm font-medium transition ${activeNav === "리포트" ? "border-[#1f6a46] text-[#19593a]" : "border-transparent text-[#657168] hover:text-[#1c2720]"}`}
+              >
+                리포트 <span className="text-[10px]">⌄</span>
+              </button>
+              {reportMenuOpen && (
+                <div className="absolute left-0 top-[58px] w-44 rounded-xl border border-[#e0e5de] bg-white p-1.5 shadow-xl">
+                  <button
+                    onClick={() => openPrintableReport(reportInput())}
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[#f2f7f2]"
+                  >
+                    PDF로 저장
+                  </button>
+                  <button
+                    onClick={() => downloadExcelReport(reportInput())}
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[#f2f7f2]"
+                  >
+                    Excel 다운로드
+                  </button>
+                </div>
+              )}
+            </div>
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <button className="hidden rounded-lg border border-[#e1e6df] px-3 py-2 text-xs text-[#657168] xl:block">
+              ⌘ K &nbsp; 검색
             </button>
+            <span
+              className="hidden h-2 w-2 rounded-full bg-[#32a16a] sm:block"
+              title="동기화됨"
+            />
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-[#e7f2ea] text-xs font-bold text-[#216340]">
+              BH
+            </div>
             <button
-              className="rounded-lg border border-[#d8ded7] px-3 py-2 text-sm"
-              onClick={() => downloadExcelReport(reportInput())}
-            >
-              엑셀 보고서
-            </button>
-            <button
-              className="rounded-lg border border-[#d8ded7] px-3 py-2 text-sm"
+              className="text-xs text-[#7b867e] hover:text-[#1c2720]"
               onClick={() => void supabase.auth.signOut()}
             >
               로그아웃
@@ -341,11 +388,42 @@ export default function Home() {
         </div>
       </header>
       <section className="mx-auto max-w-[1560px] px-6 py-7 lg:px-10">
-        <div className="mb-7">
-          <p className="mb-2 text-sm text-[#728078]">
-            {year}년 {monthNumber}월
-          </p>
-          <h1 className="text-3xl font-semibold">이번 달 마케팅 현황</h1>
+        <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-xs text-[#728078]">
+              <span>운영</span>
+              <span>›</span>
+              <span>월간 컨트롤 룸</span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-[-0.03em]">
+              {year}년 {monthNumber}월 운영 현황
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMonth(new Date(year, month.getMonth() - 1, 1))}
+              className="rounded-lg border border-[#dfe5dd] bg-white px-3 py-2 text-sm"
+            >
+              ‹
+            </button>
+            <button
+              onClick={() =>
+                setMonth(new Date(now.getFullYear(), now.getMonth(), 1))
+              }
+              className="rounded-lg border border-[#dfe5dd] bg-white px-3 py-2 text-sm font-medium"
+            >
+              이번 달
+            </button>
+            <button
+              onClick={() => setMonth(new Date(year, month.getMonth() + 1, 1))}
+              className="rounded-lg border border-[#dfe5dd] bg-white px-3 py-2 text-sm"
+            >
+              ›
+            </button>
+            <button className="ml-1 rounded-lg bg-[#1f6a46] px-3.5 py-2 text-sm font-semibold text-white shadow-sm">
+              + 빠른 입력
+            </button>
+          </div>
         </div>
         <div className="mb-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[
