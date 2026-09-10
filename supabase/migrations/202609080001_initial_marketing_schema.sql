@@ -384,6 +384,20 @@ end;
 $$;
 create trigger on_auth_user_created after insert on auth.users for each row execute function private.handle_new_user();
 
+-- The sole app user was created before this migration, so bootstrap their
+-- workspace once. Later Auth users use the trigger above.
+do $$
+declare bootstrap_user_id uuid; bootstrap_workspace_id uuid;
+begin
+  select id into bootstrap_user_id from auth.users where email = 'bhj9528@gmail.com';
+  if bootstrap_user_id is not null and not exists (select 1 from public.workspaces where owner_id = bootstrap_user_id) then
+    insert into public.workspaces (name, owner_id) values ('채움영어학원 마케팅', bootstrap_user_id) returning id into bootstrap_workspace_id;
+    insert into public.workspace_members (workspace_id, user_id, role) values (bootstrap_workspace_id, bootstrap_user_id, 'owner');
+    insert into public.profiles (id) values (bootstrap_user_id) on conflict do nothing;
+  end if;
+end;
+$$;
+
 -- Security -------------------------------------------------------------------
 alter table public.workspaces enable row level security;
 alter table public.workspace_members enable row level security;
