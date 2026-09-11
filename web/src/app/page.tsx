@@ -151,7 +151,7 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"saved" | "saving" | "error">("saved");
   const [notice, setNotice] = useState("");
-  const [nav, setNav] = useState("운영");
+  const [nav, setNav] = useState("대시보드");
   const [reportOpen, setReportOpen] = useState(false);
   const [panel, setPanel] = useState<
     "quick" | "channel" | "asset" | "event" | null
@@ -185,6 +185,20 @@ export default function Home() {
   const openEvent = () => {
     setEventDate(start);
     setPanel("event");
+  };
+  const openEventOnDay = (day: number) => {
+    setEventDate(dateKey(year, monthIndex, day));
+    setPanel("event");
+  };
+  const openAsset = (kind: "paid" | "content") => {
+    const firstChannel = channels.find((channel) =>
+      kind === "paid"
+        ? profile(channel) === "paid_ad"
+        : profile(channel) !== "paid_ad",
+    );
+    setAssetKind(kind);
+    setAssetChannel(firstChannel?.id ?? "");
+    setPanel("asset");
   };
 
   const load = async () => {
@@ -427,7 +441,6 @@ export default function Home() {
     const date = dateKey(year, monthIndex, day);
     let error = "";
     if (row.tone === "funnel") {
-      const old = recordFor(row, day) as Funnel | undefined;
       const field =
         row.metric === "kakao"
           ? "kakao_consultations"
@@ -443,12 +456,9 @@ export default function Home() {
         metric_date: date,
         [field]: value,
       };
-      const result = old
-        ? await supabase
-            .from("daily_funnel_records")
-            .update(payload)
-            .eq("id", old.id)
-        : await supabase.from("daily_funnel_records").insert(payload);
+      const result = await supabase
+        .from("daily_funnel_records")
+        .upsert(payload, { onConflict: "workspace_id,metric_date" });
       error = result.error?.message ?? "";
     } else if (row.metric === "spend") {
       const old = expenses.find(
@@ -509,13 +519,15 @@ export default function Home() {
     if (!workspaceId || !channelName.trim()) return;
     const result = await supabase
       .from("channels")
-      .insert({
+      .upsert({
         workspace_id: workspaceId,
         name: channelName.trim(),
         channel_type: channelProfile === "paid_ad" ? "paid" : "organic",
         measurement_template: channelProfile,
         color: palette[channels.length % palette.length],
-      });
+        is_active: true,
+        deleted_at: null,
+      }, { onConflict: "workspace_id,name" });
     if (result.error)
       setNotice(`채널을 만들지 못했습니다: ${result.error.message}`);
     else {
@@ -626,16 +638,11 @@ export default function Home() {
         excel={() => downloadExcelReport(reportInput())}
         logout={() => void supabase.auth.signOut()}
       />
+      {nav === "이벤트" ? (
+        <EventList events={events} onAdd={openEvent} />
+      ) : (
       <section className="mx-auto max-w-[1800px] px-5 py-6 lg:px-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="mb-2 text-xs font-medium text-[#78877e]">
-              운영 <span className="mx-1 text-[#b5beb7]">/</span> 월간 컨트롤 룸
-            </p>
-            <h1 className="text-[26px] font-semibold tracking-[-.04em]">
-              {periodLabel} 운영 현황
-            </h1>
-          </div>
+        <div className="mb-6 flex flex-wrap items-center justify-end gap-4">
           <div className="flex items-center gap-2">
             <button
               onClick={() => moveMonth(-1)}
@@ -665,33 +672,6 @@ export default function Home() {
               className="ml-1 rounded-lg bg-[#1b6d47] px-4 py-2.5 text-sm font-semibold text-white shadow-sm"
             >
               + 빠른 입력
-            </button>
-            <button
-              onClick={() => {
-                setAssetKind("paid");
-                setPanel("asset");
-              }}
-              className="toolbar-button"
-            >
-              + 유료 광고
-            </button>
-            <button
-              onClick={() => {
-                setAssetKind("content");
-                setPanel("asset");
-              }}
-              className="toolbar-button"
-            >
-              + 콘텐츠
-            </button>
-            <button onClick={openEvent} className="toolbar-button">
-              + 이벤트
-            </button>
-            <button
-              onClick={() => setPanel("channel")}
-              className="toolbar-button"
-            >
-              + 채널
             </button>
           </div>
         </div>
@@ -728,19 +708,8 @@ export default function Home() {
             helper="학원 전체 전환율"
           />
         </div>
-        <EventDock events={events} onAdd={openEvent} />
         <section className="overflow-hidden rounded-2xl border border-[#dce4dd] bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e7ece8] px-5 py-3.5">
-            <div className="flex gap-1.5">
-              {["전체", "입력 필요", "광고", "콘텐츠", "이벤트"].map((x, i) => (
-                <button
-                  key={x}
-                  className={`rounded-md px-3 py-1.5 text-xs font-medium ${i === 0 ? "bg-[#eaf4ed] text-[#17633f]" : "text-[#68776e]"}`}
-                >
-                  {x}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center justify-end gap-3 border-b border-[#e7ece8] px-5 py-3.5">
             <p
               className={`text-xs ${status === "error" ? "text-red-600" : "text-[#728178]"}`}
             >
@@ -763,7 +732,12 @@ export default function Home() {
           )}
           <div className="overflow-auto">
             <div className="min-w-[2200px]">
-              <GridHeader days={days} year={year} month={monthIndex} />
+              <GridHeader
+                days={days}
+                year={year}
+                month={monthIndex}
+                onEventDate={openEventOnDay}
+              />
               {rows.map((row) => (
                 <GridRow
                   key={row.id}
@@ -792,6 +766,7 @@ export default function Home() {
           성과는 별도 접점으로 관리합니다.
         </p>
       </section>
+      )}
       {panel && (
         <SidePanel
           panel={panel}
@@ -815,18 +790,16 @@ export default function Home() {
           eventDate={eventDate}
           setEventDate={setEventDate}
           createEvent={createEvent}
-          openAsset={(kind) => {
-            setAssetKind(kind);
-            setPanel("asset");
-          }}
+          openAsset={openAsset}
           openEvent={openEvent}
+          openChannel={() => setPanel("channel")}
         />
       )}
     </main>
   );
 }
 
-function EventDock({
+function EventList({
   events,
   onAdd,
 }: {
@@ -834,28 +807,28 @@ function EventDock({
   onAdd: () => void;
 }) {
   return (
-    <section className="mb-5 rounded-2xl border border-[#eadfce] bg-[#fffdf9] p-4 shadow-sm">
+    <section className="mx-auto max-w-[1100px] px-5 py-8 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-[#4d3823]">이벤트 · 오프라인</p>
-          <p className="mt-1 text-xs text-[#8a7968]">
-            설명회, 커피차, 방송 출연, 협업처럼 숫자만으로 남길 수 없는 사건을 기록합니다.
-          </p>
+          <p className="text-xs font-medium text-[#78877e]">이벤트</p>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-[-.04em]">사건 기록</h1>
+          <p className="mt-2 text-sm text-[#7d8a82]">캘린더 날짜를 눌러 남긴 설명회, 협업, 오프라인 활동을 모아봅니다.</p>
         </div>
-        <button onClick={onAdd} className="rounded-lg border border-[#e2c9ae] bg-white px-3.5 py-2 text-sm font-semibold text-[#8e572b]">
+        <button onClick={onAdd} className="rounded-lg bg-[#1b6d47] px-4 py-2.5 text-sm font-semibold text-white">
           + 사건 기록
         </button>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-6 grid gap-3">
         {events.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-[#ead9c7] px-3 py-2 text-xs text-[#9b8977]">
-            이번 달에 기록된 이벤트가 없습니다. 사건 기록을 추가해 맥락을 남겨주세요.
+          <p className="rounded-xl border border-dashed border-[#d9e2dc] bg-white px-5 py-8 text-center text-sm text-[#849087]">
+            이 달에 기록된 사건이 없습니다. 대시보드의 날짜를 눌러 첫 기록을 남겨주세요.
           </p>
         ) : (
           events.map((event) => (
-            <article key={event.id} className="min-w-[220px] rounded-lg border border-[#eadfce] bg-white px-3 py-2.5">
-              <p className="text-sm font-semibold text-[#4b3927]">{event.title}</p>
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#8a7968]">
+            <article key={event.id} className="rounded-xl border border-[#dfe6e0] bg-white px-5 py-4 shadow-sm">
+              <p className="text-xs font-medium text-[#809087]">{new Date(event.starts_at).toLocaleDateString("ko-KR")}</p>
+              <p className="mt-1 text-base font-semibold text-[#26362c]">{event.title}</p>
+              <p className="mt-2 text-sm leading-6 text-[#718077]">
                 {event.notes || "메모 없음"}
               </p>
             </article>
@@ -969,17 +942,12 @@ function TopBar({
     <header className="sticky top-0 z-40 border-b border-[#dce4dd] bg-white/95 px-5 backdrop-blur lg:px-8">
       <div className="mx-auto flex h-16 max-w-[1800px] items-center gap-6">
         <div className="flex shrink-0 items-center gap-2.5">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#1b6d47] text-sm font-bold text-white">
-            C
-          </div>
-          <div className="leading-tight">
-            <p className="text-sm font-bold tracking-[-.025em]">채움 마케팅</p>
-            <p className="text-[10px] font-medium text-[#829087]">풍무캠퍼스</p>
-          </div>
+          <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#1b6d47] text-sm font-bold text-white">C</div>
+          <p className="text-sm font-bold tracking-[-.025em]">채움</p>
         </div>
         <div className="hidden h-6 w-px bg-[#e4e9e5] lg:block" />
         <nav className="flex h-full items-center gap-.5">
-          {["운영", "콘텐츠", "이벤트", "비용", "분석", "채널 설정"].map(
+          {["대시보드", "콘텐츠", "이벤트", "분석"].map(
             (x) => (
               <button
                 key={x}
@@ -1001,7 +969,7 @@ function TopBar({
               }}
               className={`h-full border-b-2 px-2.5 text-sm font-medium ${nav === "리포트" ? "border-[#1b6d47] text-[#185c3e]" : "border-transparent text-[#64736a]"}`}
             >
-              리포트⌄
+              리포트
             </button>
             {reportOpen && (
               <div className="absolute left-0 top-[56px] w-44 rounded-xl border border-[#dfe6e0] bg-white p-1.5 shadow-xl">
@@ -1016,13 +984,6 @@ function TopBar({
           </div>
         </nav>
         <div className="ml-auto flex items-center gap-3">
-          <span className="hidden items-center gap-1.5 text-xs text-[#718177] lg:flex">
-            <i className="h-1.5 w-1.5 rounded-full bg-[#36ad72]" />
-            동기화됨
-          </span>
-          <div className="grid h-8 w-8 place-items-center rounded-full bg-[#e8f3eb] text-[11px] font-bold text-[#1b6d47]">
-            BH
-          </div>
           <button onClick={logout} className="text-xs text-[#829087]">
             로그아웃
           </button>
@@ -1060,10 +1021,12 @@ function GridHeader({
   days,
   year,
   month,
+  onEventDate,
 }: {
   days: number[];
   year: number;
   month: number;
+  onEventDate: (day: number) => void;
 }) {
   return (
     <div
@@ -1077,15 +1040,17 @@ function GridHeader({
         {month + 1}월 합계
       </div>
       {days.map((day) => (
-        <div
+        <button
           key={day}
-          className="border-l border-[#e9eeea] px-1 py-2.5 text-center"
+          onClick={() => onEventDate(day)}
+          title={`${month + 1}월 ${day}일에 이벤트 기록`}
+          className="border-l border-[#e9eeea] px-1 py-2.5 text-center transition hover:bg-[#fff6e8]"
         >
           <p className="text-xs font-semibold text-[#44544a]">{day}</p>
           <p className="mt-.5 text-[10px] text-[#98a39b]">
             {weekdays[new Date(year, month, day).getDay()]}
           </p>
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -1224,6 +1189,7 @@ function SidePanel({
   createEvent,
   openAsset,
   openEvent,
+  openChannel,
 }: {
   panel: "quick" | "channel" | "asset" | "event";
   close: () => void;
@@ -1248,6 +1214,7 @@ function SidePanel({
   createEvent: (e: FormEvent) => void;
   openAsset: (kind: "paid" | "content") => void;
   openEvent: () => void;
+  openChannel: () => void;
 }) {
   const title =
     panel === "channel"
@@ -1408,9 +1375,9 @@ function SidePanel({
               <b>콘텐츠 추가</b>
               <span>블로그, 인스타그램 게시물·릴스</span>
             </button>
-            <button onClick={close} className="quick-option">
-              <b>오늘의 학원 퍼널 입력</b>
-              <span>유입 · 카카오 · 전화 · 방문 · 등록</span>
+            <button onClick={openChannel} className="quick-option">
+              <b>채널 추가·수정</b>
+              <span>새 매체와 그 매체의 측정 지표를 설정</span>
             </button>
           </div>
         )}
