@@ -89,3 +89,11 @@ textarea {
   color: #7a8a80;
   font-size: 12px;
 }
+.asset-action {
+  color: #52665a;
+  font-weight: 600;
+}
+.asset-action:hover {
+  color: #1b6d47;
+  text-decoration: underline;
+}

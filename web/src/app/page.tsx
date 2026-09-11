@@ -18,6 +18,7 @@ type Content = {
   status: string;
   published_at: string | null;
   channel_id?: string | null;
+  deleted_at?: string | null;
 };
 type Performance = {
   id: string;
@@ -135,6 +136,7 @@ export default function Home() {
   );
   const [channels, setChannels] = useState<Channel[]>([]);
   const [contents, setContents] = useState<Content[]>([]);
+  const [deletedContents, setDeletedContents] = useState<Content[]>([]);
   const [records, setRecords] = useState<Performance[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [funnels, setFunnels] = useState<Funnel[]>([]);
@@ -191,11 +193,7 @@ export default function Home() {
     setPanel("event");
   };
   const openAsset = (kind: "paid" | "content") => {
-    const firstChannel = channels.find((channel) =>
-      kind === "paid"
-        ? profile(channel) === "paid_ad"
-        : profile(channel) !== "paid_ad",
-    );
+    const firstChannel = channels[0];
     setAssetKind(kind);
     setAssetChannel(firstChannel?.id ?? "");
     setPanel("asset");
@@ -276,18 +274,25 @@ export default function Home() {
     setEvents((eventResult.data ?? []) as MarketingEvent[]);
     const result = await supabase
       .from("contents")
-      .select("id,title,content_type,status,published_at,channel_id")
+      .select("id,title,content_type,status,published_at,channel_id,deleted_at")
       .eq("workspace_id", ws)
       .is("deleted_at", null)
       .order("published_at", { ascending: false });
     if (result.error) {
       const legacy = await supabase
         .from("contents")
-        .select("id,title,content_type,status,published_at")
+        .select("id,title,content_type,status,published_at,deleted_at")
         .eq("workspace_id", ws)
         .is("deleted_at", null);
       setContents((legacy.data ?? []) as Content[]);
     } else setContents((result.data ?? []) as Content[]);
+    const deletedResult = await supabase
+      .from("contents")
+      .select("id,title,content_type,status,published_at,channel_id,deleted_at")
+      .eq("workspace_id", ws)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+    setDeletedContents((deletedResult.data ?? []) as Content[]);
     setLoading(false);
   };
   useEffect(() => {
@@ -577,6 +582,47 @@ export default function Home() {
     setEventNotes("");
     await load();
   };
+  const setContentStatus = async (content: Content, status: "archived" | "published") => {
+    const result = await supabase
+      .from("contents")
+      .update({ status })
+      .eq("id", content.id);
+    if (result.error) setNotice(`소재 상태를 바꾸지 못했습니다: ${result.error.message}`);
+    else await load();
+  };
+  const deleteContent = async (content: Content) => {
+    if (!window.confirm(`“${content.title}” 소재를 휴지통으로 이동할까요?`)) return;
+    const result = await supabase
+      .from("contents")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", content.id);
+    if (result.error) setNotice(`소재를 삭제하지 못했습니다: ${result.error.message}`);
+    else await load();
+  };
+  const restoreContent = async (content: Content) => {
+    const result = await supabase
+      .from("contents")
+      .update({ deleted_at: null, status: "published" })
+      .eq("id", content.id);
+    if (result.error) setNotice(`소재를 복원하지 못했습니다: ${result.error.message}`);
+    else await load();
+  };
+  const deleteChannel = async (channel: Channel) => {
+    if (!window.confirm(`“${channel.name}” 채널을 삭제할까요? 연결 소재는 콘텐츠 목록에 보존됩니다.`)) return;
+    const result = await supabase
+      .from("channels")
+      .update({ is_active: false, deleted_at: new Date().toISOString() })
+      .eq("id", channel.id);
+    if (result.error) setNotice(`채널을 삭제하지 못했습니다: ${result.error.message}`);
+    else await load();
+  };
+  const renameChannel = async (channel: Channel) => {
+    const name = window.prompt("채널 이름", channel.name)?.trim();
+    if (!name || name === channel.name) return;
+    const result = await supabase.from("channels").update({ name }).eq("id", channel.id);
+    if (result.error) setNotice(`채널 이름을 바꾸지 못했습니다: ${result.error.message}`);
+    else await load();
+  };
   const reportInput = () => ({
     periodLabel,
     channels: channels.map((x) => ({
@@ -640,6 +686,20 @@ export default function Home() {
       />
       {nav === "이벤트" ? (
         <EventList events={events} onAdd={openEvent} />
+      ) : nav === "콘텐츠" ? (
+        <ContentLibrary
+          channels={channels}
+          contents={contents}
+          deletedContents={deletedContents}
+          onAddChannel={() => setPanel("channel")}
+          onAddAsset={openAsset}
+          onArchive={(content) => void setContentStatus(content, "archived")}
+          onRestore={(content) => void setContentStatus(content, "published")}
+          onDelete={(content) => void deleteContent(content)}
+          onRestoreDeleted={(content) => void restoreContent(content)}
+          onRenameChannel={(channel) => void renameChannel(channel)}
+          onDeleteChannel={(channel) => void deleteChannel(channel)}
+        />
       ) : (
       <section className="mx-auto max-w-[1800px] px-5 py-6 lg:px-8">
         <div className="mb-6 flex flex-wrap items-center justify-end gap-4">
@@ -783,6 +843,7 @@ export default function Home() {
           setAssetChannel={setAssetChannel}
           createAsset={createAsset}
           assetKind={assetKind}
+          setAssetKind={setAssetKind}
           eventTitle={eventTitle}
           setEventTitle={setEventTitle}
           eventNotes={eventNotes}
@@ -839,6 +900,104 @@ function EventList({
   );
 }
 
+function ContentLibrary({
+  channels,
+  contents,
+  deletedContents,
+  onAddChannel,
+  onAddAsset,
+  onArchive,
+  onRestore,
+  onDelete,
+  onRestoreDeleted,
+  onRenameChannel,
+  onDeleteChannel,
+}: {
+  channels: Channel[];
+  contents: Content[];
+  deletedContents: Content[];
+  onAddChannel: () => void;
+  onAddAsset: (kind: "paid" | "content") => void;
+  onArchive: (content: Content) => void;
+  onRestore: (content: Content) => void;
+  onDelete: (content: Content) => void;
+  onRestoreDeleted: (content: Content) => void;
+  onRenameChannel: (channel: Channel) => void;
+  onDeleteChannel: (channel: Channel) => void;
+}) {
+  const active = contents.filter((content) => content.status !== "archived");
+  const archived = contents.filter((content) => content.status === "archived");
+  const channelName = (id?: string | null) =>
+    channels.find((channel) => channel.id === id)?.name ?? "연결 채널 없음";
+  return (
+    <section className="mx-auto max-w-[1100px] px-5 py-8 lg:px-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium text-[#78877e]">콘텐츠</p>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-[-.04em]">채널 · 소재 관리</h1>
+          <p className="mt-2 text-sm text-[#7d8a82]">채널 아래에 소재를 쌓고, 종료된 소재는 아카이브로 옮겨 대시보드를 정리합니다.</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onAddChannel} className="toolbar-button">+ 채널</button>
+          <button onClick={() => onAddAsset("content")} className="toolbar-button">+ 소재</button>
+        </div>
+      </div>
+
+      <section className="mt-7">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold">채널</h2>
+          <span className="text-xs text-[#87938b]">채널은 대시보드의 최상위 카테고리입니다.</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {channels.map((channel) => (
+            <article key={channel.id} className="rounded-xl border border-[#dfe6e0] bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-base font-semibold text-[#26362c]">{channel.name}</p>
+                  <p className="mt-1 text-xs text-[#7d8a82]">{profile(channel) === "paid_ad" ? "광고 지표 템플릿" : profile(channel) === "social_content" ? "인스타 지표 템플릿" : profile(channel) === "blog_content" ? "블로그 지표 템플릿" : "사용자 정의 템플릿"}</p>
+                </div>
+                <div className="flex gap-2 text-xs">
+                  <button onClick={() => onRenameChannel(channel)} className="text-[#52665a]">수정</button>
+                  <button onClick={() => onDeleteChannel(channel)} className="text-[#b75d4d]">삭제</button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <AssetSection title="운영 중 소재" empty="운영 중인 소재가 없습니다." contents={active} channelName={channelName}
+        actions={(content) => <><button onClick={() => onArchive(content)} className="asset-action">아카이브</button><button onClick={() => onDelete(content)} className="asset-action text-[#b75d4d]">삭제</button></>} />
+      <AssetSection title="아카이브" empty="아카이브된 소재가 없습니다." contents={archived} channelName={channelName}
+        actions={(content) => <><button onClick={() => onRestore(content)} className="asset-action">대시보드에 복원</button><button onClick={() => onDelete(content)} className="asset-action text-[#b75d4d]">삭제</button></>} />
+      <AssetSection title="휴지통" empty="삭제된 소재가 없습니다." contents={deletedContents} channelName={channelName}
+        actions={(content) => <button onClick={() => onRestoreDeleted(content)} className="asset-action">복원</button>} />
+    </section>
+  );
+}
+
+function AssetSection({ title, empty, contents, channelName, actions }: {
+  title: string;
+  empty: string;
+  contents: Content[];
+  channelName: (id?: string | null) => string;
+  actions: (content: Content) => React.ReactNode;
+}) {
+  return (
+    <section className="mt-8">
+      <h2 className="mb-3 text-sm font-semibold">{title} <span className="ml-1 text-xs font-normal text-[#8b978f]">{contents.length}</span></h2>
+      <div className="overflow-hidden rounded-xl border border-[#dfe6e0] bg-white">
+        {contents.length === 0 ? <p className="px-5 py-6 text-sm text-[#87938b]">{empty}</p> : contents.map((content) => (
+          <article key={content.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef1ee] px-5 py-3.5 last:border-0">
+            <div><p className="text-sm font-semibold text-[#2c3c32]">{content.title}</p><p className="mt-1 text-xs text-[#829087]">{channelName(content.channel_id)} · {content.content_type === "ad_creative" ? "광고 소재" : "콘텐츠"}</p></div>
+            <div className="flex gap-3 text-xs">{actions(content)}</div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function appendRows(
   list: Row[],
   channel: Channel,
@@ -862,7 +1021,9 @@ function appendRows(
     tone: p === "paid_ad" ? "paid" : "social",
   });
   if (!expanded[channelId]) return;
-  const assets = contents.filter((x) => x.channel_id === channel.id);
+  const assets = contents.filter(
+    (x) => x.channel_id === channel.id && x.status !== "archived",
+  );
   if (!assets.length) {
     list.push({
       id: `${channelId}-empty`,
@@ -1180,6 +1341,7 @@ function SidePanel({
   setAssetChannel,
   createAsset,
   assetKind,
+  setAssetKind,
   eventTitle,
   setEventTitle,
   eventNotes,
@@ -1205,6 +1367,7 @@ function SidePanel({
   setAssetChannel: (x: string) => void;
   createAsset: (e: FormEvent) => void;
   assetKind: "paid" | "content";
+  setAssetKind: (kind: "paid" | "content") => void;
   eventTitle: string;
   setEventTitle: (x: string) => void;
   eventNotes: string;
@@ -1226,11 +1389,7 @@ function SidePanel({
         : panel === "event"
           ? "이벤트 · 오프라인 기록"
         : "빠른 입력";
-  const eligibleChannels = channels.filter((channel) =>
-    assetKind === "paid"
-      ? profile(channel) === "paid_ad"
-      : profile(channel) !== "paid_ad",
-  );
+  const eligibleChannels = channels;
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-[#142218]/20"
@@ -1286,6 +1445,12 @@ function SidePanel({
         )}
         {panel === "asset" && (
           <form onSubmit={createAsset} className="mt-8 space-y-5">
+            <Field label="집행 방식">
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setAssetKind("content")} className={`rounded-lg border px-3 py-3 text-left text-sm ${assetKind === "content" ? "border-[#1b6d47] bg-[#edf8f0] font-semibold text-[#185c3e]" : "border-[#dfe6e0] text-[#68776e]"}`}>무료 콘텐츠</button>
+                <button type="button" onClick={() => setAssetKind("paid")} className={`rounded-lg border px-3 py-3 text-left text-sm ${assetKind === "paid" ? "border-[#1b6d47] bg-[#edf8f0] font-semibold text-[#185c3e]" : "border-[#dfe6e0] text-[#68776e]"}`}>유료 집행</button>
+              </div>
+            </Field>
             <Field
               label={
                 assetKind === "paid" ? "광고 소재 제목" : "콘텐츠 제목"
@@ -1312,7 +1477,7 @@ function SidePanel({
                 required
               >
                 <option value="">
-                  {assetKind === "paid" ? "광고 채널 선택" : "콘텐츠 채널 선택"}
+                  채널 선택
                 </option>
                 {eligibleChannels.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -1323,8 +1488,8 @@ function SidePanel({
             </Field>
             <p className="rounded-lg bg-[#f2f7f3] p-3 text-xs leading-5 text-[#527060]">
               {assetKind === "paid"
-                ? "광고 채널만 선택할 수 있습니다. 노출·클릭·반응·지출 행이 생성됩니다."
-                : "콘텐츠 채널만 선택할 수 있습니다. 플랫폼별 측정 프로필에 맞는 행이 생성됩니다."}
+                ? "유료 집행은 비용과 광고 성과를 함께 기록합니다. 이후 기간별 집행 이력을 추가할 수 있습니다."
+                : "채널 템플릿에 맞는 일반 콘텐츠 지표를 기록합니다."}
             </p>
             <Submit label={assetKind === "paid" ? "광고 소재 만들기" : "콘텐츠 만들기"} />
           </form>
