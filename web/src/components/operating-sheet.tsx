@@ -1,0 +1,521 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import {
+  CellChange,
+  Data,
+  Metric,
+  MetricRow,
+  Period,
+  datePart,
+  dates,
+  modeLabels,
+  number,
+  scopeLabels,
+} from "@/lib/domain";
+import { metricValue } from "@/lib/analytics";
+import { EditorState } from "./editor";
+type DisplayRow = {
+  id: string;
+  label: string;
+  depth: number;
+  detail?: string;
+  metricRow?: MetricRow;
+  edit?: EditorState;
+  add?: EditorState;
+  parentIds: string[];
+};
+export function cellNumber(raw: string, metric: Metric | null): number | null {
+  const clean = raw.replaceAll(",", "").trim();
+  if (clean === "" || clean === "—") return null;
+  const v = Number(clean);
+  if (!Number.isFinite(v) || v < 0)
+    throw new Error("0 이상의 숫자만 입력하세요.");
+  if (metric?.unit === "count" && !Number.isInteger(v))
+    throw new Error("건수는 정수로 입력하세요.");
+  return v;
+}
+function EditableCell({
+  value,
+  label,
+  cellId,
+  onSave,
+  onMove,
+  onPaste,
+}: {
+  value: number | null;
+  label: string;
+  cellId: string;
+  onSave: (raw: string) => Promise<void>;
+  onMove: (key: string, shift: boolean) => void;
+  onPaste: (raw: string) => Promise<void>;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const committed = useRef(value === null ? "" : String(value));
+  const dirty = useRef(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const raw = value === null ? "" : String(value);
+    if (
+      ref.current &&
+      document.activeElement !== ref.current &&
+      !dirty.current
+    ) {
+      ref.current.value = raw;
+      committed.current = raw;
+    }
+  }, [value]);
+  async function commit() {
+    const raw = ref.current?.value ?? "";
+    if (raw === committed.current) return;
+    committed.current = raw;
+    dirty.current = true;
+    setError("");
+    try {
+      await onSave(raw);
+      dirty.current = false;
+    } catch (e) {
+      committed.current = value === null ? "" : String(value);
+      setError(e instanceof Error ? e.message : "저장 실패");
+    }
+  }
+  return (
+    <input
+      ref={ref}
+      defaultValue={value ?? ""}
+      data-cell={cellId}
+      inputMode="decimal"
+      aria-label={label}
+      aria-invalid={!!error}
+      title={error || label}
+      className={error ? "cell-error" : ""}
+      placeholder="—"
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={() => {
+        dirty.current = true;
+      }}
+      onBlur={() => void commit()}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.currentTarget.value = value === null ? "" : String(value);
+          committed.current = e.currentTarget.value;
+          dirty.current = false;
+          setError("");
+          e.currentTarget.blur();
+        } else if (["Enter", "Tab", "ArrowUp", "ArrowDown"].includes(e.key)) {
+          e.preventDefault();
+          void commit();
+          onMove(e.key, e.shiftKey);
+        }
+      }}
+      onPaste={(e) => {
+        const raw = e.clipboardData.getData("text");
+        if (raw.includes("\t") || raw.includes("\n")) {
+          e.preventDefault();
+          void onPaste(raw)
+            .then(() => {
+              const first = raw
+                .split(/[\t\r\n]/)[0]
+                .replaceAll(",", "")
+                .trim();
+              if (ref.current) ref.current.value = first;
+              committed.current = first;
+              dirty.current = false;
+              setError("");
+            })
+            .catch((e) =>
+              setError(e instanceof Error ? e.message : "붙여넣기 실패"),
+            );
+        }
+      }}
+    />
+  );
+}
+export function OperatingSheet({
+  data,
+  period,
+  onEdit,
+  onSave,
+  onDate,
+  onDetail,
+}: {
+  data: Data;
+  period: Period;
+  onEdit: (state: EditorState) => void;
+  onSave: (cells: CellChange[]) => Promise<void>;
+  onDate: (date: string) => void;
+  onDetail: (id: string) => void;
+}) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [includeArchive, setIncludeArchive] = useState(false);
+  const [error, setError] = useState("");
+  const table = useRef<HTMLDivElement>(null);
+  const ds = dates(period);
+  const rows: DisplayRow[] = [];
+  const metricRows = (
+    metrics: Metric[],
+    content: string | null,
+    promotion: string | null,
+    depth: number,
+    parents: string[],
+    start?: string,
+    end?: string,
+  ) =>
+    metrics
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .forEach((m) =>
+        rows.push({
+          id: `${m.id}:${content}:${promotion}`,
+          label: m.name,
+          depth,
+          parentIds: parents,
+          detail: `${scopeLabels[m.scope]} · ${modeLabels[m.mode]}`,
+          edit: { collection: "metrics", record: m },
+          metricRow: {
+            id: m.id,
+            label: m.name,
+            kind: "metric",
+            metric: m,
+            content_id: content,
+            promotion_id: promotion,
+            start,
+            end,
+          },
+        }),
+      );
+  rows.push({
+    id: "funnel",
+    label: "학원 전체 퍼널",
+    depth: 0,
+    parentIds: [],
+    detail: "채널 실적과 분리된 일일 전체 집계",
+    add: { collection: "metrics", record: { scope: "funnel" } },
+  });
+  metricRows(
+    data.metrics.filter((m) => m.scope === "funnel" && !m.deleted_at),
+    null,
+    null,
+    1,
+    ["funnel"],
+  );
+  data.channels
+    .filter((ch) => !ch.deleted_at)
+    .forEach((ch) => {
+      rows.push({
+        id: ch.id,
+        label: ch.name,
+        depth: 0,
+        parentIds: [],
+        detail: "채널",
+        edit: { collection: "channels", record: ch },
+        add: { collection: "contents", record: { channel_id: ch.id } },
+      });
+      const contents = data.contents.filter(
+        (c) =>
+          c.channel_id === ch.id &&
+          !c.deleted_at &&
+          (includeArchive || c.status !== "archived"),
+      );
+      contents.forEach((c) => {
+        rows.push({
+          id: c.id,
+          label: c.title,
+          depth: 1,
+          parentIds: [ch.id],
+          detail: `${c.status === "archived" ? "아카이브 · " : ""}${datePart(c.published_at) || "발행일 미입력"}`,
+          edit: { collection: "contents", record: c },
+          add: { collection: "promotions", record: { content_id: c.id } },
+        });
+        const ms = data.metrics.filter(
+          (m) => m.channel_id === ch.id && !m.deleted_at,
+        );
+        metricRows(
+          ms.filter((m) => m.scope !== "paid"),
+          c.id,
+          null,
+          2,
+          [ch.id, c.id],
+        );
+        data.promotions
+          .filter(
+            (p) =>
+              p.content_id === c.id &&
+              !p.deleted_at &&
+              p.start_date <= period.end &&
+              p.end_date >= period.start,
+          )
+          .forEach((p) => {
+            rows.push({
+              id: p.id,
+              label: p.title,
+              depth: 2,
+              parentIds: [ch.id, c.id],
+              detail: `광고 · ${p.start_date} ~ ${p.end_date}`,
+              edit: { collection: "promotions", record: p },
+            });
+            metricRows(
+              ms.filter((m) => m.scope === "paid"),
+              c.id,
+              p.id,
+              3,
+              [ch.id, c.id, p.id],
+              p.start_date,
+              p.end_date,
+            );
+            rows.push({
+              id: `cost:${p.id}`,
+              label: "광고비",
+              depth: 3,
+              parentIds: [ch.id, c.id, p.id],
+              detail: "비용 원장 · 지급액",
+              metricRow: {
+                id: p.id,
+                label: "광고비",
+                kind: "cost",
+                metric: null,
+                content_id: c.id,
+                promotion_id: p.id,
+                start: p.start_date,
+                end: p.end_date,
+              },
+            });
+          });
+      });
+    });
+  const visible = rows.filter((r) => !r.parentIds.some((id) => collapsed[id]));
+  const editable = visible.filter(
+    (r) => r.metricRow && r.metricRow.metric?.mode !== "ratio",
+  );
+  const allowed = (row: MetricRow, date: string) =>
+    !row.start || (date >= row.start && date <= row.end!);
+  const change = (row: MetricRow, date: string, raw: string): CellChange => ({
+    kind: row.kind,
+    metric_id: row.metric?.id,
+    content_id: row.content_id,
+    promotion_id: row.promotion_id,
+    date,
+    value: cellNumber(raw, row.metric),
+  });
+  const paste = async (rowIndex: number, dayIndex: number, text: string) => {
+    setError("");
+    try {
+      const matrix = text
+        .replace(/\r/g, "")
+        .replace(/\n$/, "")
+        .split("\n")
+        .map((line) => line.split("\t"));
+      const changes: CellChange[] = [];
+      matrix.forEach((line, i) =>
+        line.forEach((raw, j) => {
+          const row = editable[rowIndex + i]?.metricRow,
+            date = ds[dayIndex + j];
+          if (!row || !date || !allowed(row, date))
+            throw new Error(
+              "붙여넣기 범위가 표 또는 광고 집행 기간을 벗어났습니다.",
+            );
+          changes.push(change(row, date, raw));
+        }),
+      );
+      await onSave(changes);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "붙여넣지 못했습니다.");
+      throw e;
+    }
+  };
+  const move = (row: number, col: number, key: string, shift: boolean) => {
+    let r = row,
+      c = col;
+    const step = shift ? -1 : 1;
+    if (key === "Tab") {
+      c += step;
+      if (c >= ds.length) {
+        c = 0;
+        r++;
+      }
+      if (c < 0) {
+        c = ds.length - 1;
+        r--;
+      }
+    } else r += key === "ArrowUp" ? -1 : key === "ArrowDown" ? 1 : step;
+    const target = table.current?.querySelector<HTMLInputElement>(
+      `[data-cell="${r}:${c}"]`,
+    );
+    target?.focus();
+  };
+  return (
+    <section className="sheet-card">
+      <div className="sheet-tools">
+        <span>날짜별 운영 시트</span>
+        <div>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={includeArchive}
+              onChange={(e) => setIncludeArchive(e.target.checked)}
+            />
+            아카이브 포함
+          </label>
+          <button onClick={() => onEdit({ collection: "channels" })}>
+            ＋ 채널
+          </button>
+        </div>
+      </div>
+      {error && (
+        <p className="error-box" role="alert">
+          {error}
+        </p>
+      )}
+      <div ref={table} className="sheet-scroll">
+        <table className="operating-sheet">
+          <thead>
+            <tr>
+              <th className="label-col">운영 대상 / 지표</th>
+              <th className="summary-col">월간 요약</th>
+              {ds.map((date) => (
+                <th
+                  key={date}
+                  className={
+                    new Date(`${date}T12:00:00Z`).getUTCDay() === 0
+                      ? "sunday"
+                      : ""
+                  }
+                >
+                  <button
+                    onClick={() => onDate(date)}
+                    title={`${date} 이벤트 기록`}
+                  >
+                    <b>{Number(date.slice(-2))}</b>
+                    <small>
+                      {
+                        ["일", "월", "화", "수", "목", "금", "토"][
+                          new Date(`${date}T12:00:00Z`).getUTCDay()
+                        ]
+                      }
+                    </small>
+                    {data.events.some(
+                      (e) => !e.deleted_at && datePart(e.starts_at) === date,
+                    ) && <i className="event-dot" />}
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((r) => {
+              const row = r.metricRow;
+              const ri = editable.findIndex((e) => e.id === r.id);
+              const aggregate = row ? metricValue(data, row, period) : null;
+              return (
+                <tr
+                  key={r.id}
+                  className={
+                    row
+                      ? "metric-row"
+                      : r.depth === 0
+                        ? "channel-row"
+                        : "content-row"
+                  }
+                >
+                  <th
+                    className="label-col"
+                    style={{ paddingLeft: 14 + r.depth * 16 }}
+                  >
+                    <div className="row-label">
+                      {!row && (
+                        <button
+                          className="toggle"
+                          aria-label={`${r.label} ${collapsed[r.id] ? "펼치기" : "접기"}`}
+                          onClick={() =>
+                            setCollapsed((x) => ({ ...x, [r.id]: !x[r.id] }))
+                          }
+                        >
+                          {collapsed[r.id] ? "›" : "⌄"}
+                        </button>
+                      )}
+                      <button
+                        className="row-name"
+                        title={r.detail}
+                        onClick={() =>
+                          r.edit?.collection === "contents"
+                            ? onDetail(r.id)
+                            : r.edit && onEdit(r.edit)
+                        }
+                        disabled={!r.edit}
+                      >
+                        <b>{r.label}</b>
+                        <small>{r.detail}</small>
+                      </button>
+                      {r.add && (
+                        <button
+                          className="row-add"
+                          aria-label={`${r.label} 항목 추가`}
+                          onClick={() => onEdit(r.add!)}
+                        >
+                          ＋
+                        </button>
+                      )}
+                    </div>
+                  </th>
+                  <td
+                    className="summary-col"
+                    title={
+                      aggregate?.observedOn
+                        ? `마지막 관측 ${aggregate.observedOn}`
+                        : ""
+                    }
+                  >
+                    {row &&
+                      number(
+                        aggregate?.value,
+                        row.metric?.unit === "percent"
+                          ? "%"
+                          : row.kind === "cost" ||
+                              row.metric?.unit === "currency"
+                            ? "원"
+                            : "",
+                      )}
+                  </td>
+                  {ds.map((date, di) => (
+                    <td
+                      key={date}
+                      className={
+                        row && !allowed(row, date) ? "out-of-period" : ""
+                      }
+                    >
+                      {row &&
+                        allowed(row, date) &&
+                        (row.metric?.mode === "ratio" ? (
+                          <span className="derived">
+                            {number(
+                              metricValue(data, row, { start: date, end: date })
+                                .value,
+                              row.metric.unit === "percent" ? "%" : "",
+                            )}
+                          </span>
+                        ) : (
+                          <EditableCell
+                            cellId={`${ri}:${di}`}
+                            label={`${row.content_id ? data.contents.find((c) => c.id === row.content_id)?.title + " · " : ""}${row.promotion_id ? data.promotions.find((p) => p.id === row.promotion_id)?.title + " · " : ""}${r.label} ${date}`}
+                            value={
+                              metricValue(data, row, { start: date, end: date })
+                                .value
+                            }
+                            onSave={(raw) => onSave([change(row, date, raw)])}
+                            onMove={(key, shift) => move(ri, di, key, shift)}
+                            onPaste={(raw) => paste(ri, di, raw)}
+                          />
+                        ))}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="sheet-help">
+        Enter ↓ · Shift+Enter ↑ · Tab → · Excel 범위 붙여넣기 · 빈칸은 미입력,
+        0은 실제 0 · 누적값은 마지막 관측 기준
+      </div>
+    </section>
+  );
+}

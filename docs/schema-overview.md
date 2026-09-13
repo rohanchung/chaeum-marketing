@@ -1,5 +1,7 @@
 # Initial schema overview
 
+> Historical design. The current app uses `mkt_metrics`, `mkt_values`, `mkt_promotions`, `mkt_costs`, `mkt_customers` and `mkt_payments`; see [the current implementation](implementation-20260913.md). Legacy tables remain for preservation and are exported in backups. The manual initial-schema instructions below describe the original setup, not the current deployment procedure.
+
 The operating sheet queries `performance_records` and `expenses` by `metric_date` / `expense_date` and `channel_id`. It is deliberately a one-to-many model: a date-channel cell can hold multiple campaigns, contents, events, and expenses without losing detail.
 
 ## Core relationships
