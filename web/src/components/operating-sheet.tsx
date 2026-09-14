@@ -15,6 +15,7 @@ import {
   metricsForContent,
 } from "@/lib/domain";
 import { metricValue } from "@/lib/analytics";
+import { RollupTarget, rollupOptions, rollupValue } from "@/lib/sheet-rollup";
 import { isEventChannel, sheetPromotions } from "@/lib/sheet-ad";
 import { EditorState } from "./editor";
 type DisplayRow = {
@@ -26,6 +27,9 @@ type DisplayRow = {
   edit?: EditorState;
   add?: EditorState;
   parentIds: string[];
+  rollup?: RollupTarget;
+  fixedRollup?: string;
+  finance?: boolean;
 };
 export function cellNumber(raw: string, metric: Metric | null): number | null {
   const clean = raw.replaceAll(",", "").trim();
@@ -155,6 +159,15 @@ export function OperatingSheet({
   actions?: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const selectionKey = `sheet-rollups:${data.channels[0]?.workspace_id ?? ""}`;
+  const [selections, setSelections] = useState<Record<string, string>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(selectionKey) || "{}");
+      return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+    } catch {
+      return {};
+    }
+  });
   const isCollapsed = (id: string) =>
     collapsed[id] ??
     data.contents.some((c) => c.id === id && !isBusinessProfile(c));
@@ -229,6 +242,7 @@ export function OperatingSheet({
         depth: 0,
         parentIds: [],
         detail: "채널",
+        rollup: { channelId: ch.id },
         edit: { collection: "channels", record: ch },
         add: { collection: "contents", record: { channel_id: ch.id } },
       });
@@ -248,6 +262,8 @@ export function OperatingSheet({
           label: c.title,
           depth: 1,
           parentIds: [ch.id],
+          rollup: { contentId: c.id },
+          finance: !isBusinessProfile(c),
           detail: `${c.status === "archived" ? "아카이브 · " : ""}${datePart(c.published_at) || "발행일 미입력"}`,
           edit: { collection: "contents", record: c },
           add: isBusinessProfile(c)
@@ -263,7 +279,9 @@ export function OperatingSheet({
           [ch.id, c.id],
         );
         if (isBusinessProfile(c)) return;
-        const directAd = ch.measurement_template === "paid_ad";
+        const directAd = ["paid_ad", "social_content", "search_ad"].includes(
+          ch.measurement_template,
+        );
         const promotions = directAd
           ? sheetPromotions(data, c.id, period)
           : data.promotions.filter(
@@ -334,6 +352,16 @@ export function OperatingSheet({
               end: p.end_date,
             },
           });
+        });
+        rows.push({
+          id: `roi:${c.id}`,
+          label: "ROI",
+          depth: 2,
+          parentIds: [ch.id, c.id],
+          rollup: { contentId: c.id },
+          fixedRollup: "roi",
+          detail:
+            "(연결 순수납 − 수업 원가 − 마케팅 비용) ÷ 마케팅 비용. 연결 매출·원가가 없으면 —",
         });
       });
     });
@@ -508,13 +536,31 @@ export function OperatingSheet({
             </tr>
             {visible.map((r) => {
               const row = r.metricRow;
+              const children = rows
+                .filter(
+                  (child) => child.parentIds.includes(r.id) && child.metricRow,
+                )
+                .map((child) => child.metricRow!);
+              const options =
+                r.rollup && !r.fixedRollup
+                  ? rollupOptions(children, r.finance !== false)
+                  : [];
+              const selected =
+                r.fixedRollup ??
+                (options.some((o) => o.id === selections[r.id])
+                  ? selections[r.id]
+                  : options[0]?.id);
+              const rollupUnit =
+                r.fixedRollup === "roi"
+                  ? "%"
+                  : (options.find((o) => o.id === selected)?.unit ?? "");
               const ri = editable.findIndex((e) => e.id === r.id);
               const aggregate = row ? metricValue(data, row, period) : null;
               return (
                 <tr
                   key={r.id}
                   className={
-                    row
+                    row || r.fixedRollup
                       ? "metric-row"
                       : r.depth === 0
                         ? "channel-row"
@@ -526,7 +572,7 @@ export function OperatingSheet({
                     style={{ paddingLeft: 14 + r.depth * 16 }}
                   >
                     <div className="row-label">
-                      {!row && !r.id.startsWith("setup:") && (
+                      {!row && !r.fixedRollup && !r.id.startsWith("setup:") && (
                         <button
                           className="toggle"
                           aria-label={`${r.label} ${isCollapsed(r.id) ? "펼치기" : "접기"}`}
@@ -589,6 +635,53 @@ export function OperatingSheet({
                         : ""
                     }
                   >
+                    {r.rollup && selected && (
+                      <div className="rollup-summary">
+                        {!r.fixedRollup && (
+                          <select
+                            aria-label={`${r.label} 요약 지표`}
+                            value={selected}
+                            onChange={(e) => {
+                              const next = {
+                                ...selections,
+                                [r.id]: e.target.value,
+                              };
+                              setSelections(next);
+                              try {
+                                localStorage.setItem(
+                                  selectionKey,
+                                  JSON.stringify(next),
+                                );
+                              } catch {}
+                            }}
+                          >
+                            {options.map((o) => (
+                              <option key={o.id} value={o.id}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <span
+                          title={
+                            selected === "roi"
+                              ? "연결 매출·원가·마케팅 비용으로 계산. 자료가 없으면 —"
+                              : "선택 지표의 월간 집계"
+                          }
+                        >
+                          {number(
+                            rollupValue(
+                              data,
+                              children,
+                              r.rollup,
+                              selected,
+                              period,
+                            ),
+                            rollupUnit,
+                          )}
+                        </span>
+                      </div>
+                    )}
                     {row &&
                       number(
                         aggregate?.value,
@@ -609,6 +702,24 @@ export function OperatingSheet({
                         (row && !allowed(row, date) ? "out-of-period" : "")
                       }
                     >
+                      {r.rollup && selected && (
+                        <span
+                          className="derived"
+                          title={
+                            selected === "roi"
+                              ? "해당 날짜 수납·원가·비용 기준 ROI, 자료가 없으면 —"
+                              : undefined
+                          }
+                        >
+                          {number(
+                            rollupValue(data, children, r.rollup, selected, {
+                              start: date,
+                              end: date,
+                            }),
+                            rollupUnit,
+                          )}
+                        </span>
+                      )}
                       {row &&
                         allowed(row, date) &&
                         (row.metric?.mode === "ratio" ? (

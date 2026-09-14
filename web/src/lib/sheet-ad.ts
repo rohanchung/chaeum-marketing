@@ -67,7 +67,9 @@ export async function resolveSheetCells(
     if (
       !content ||
       isBusinessProfile(content) ||
-      channel?.measurement_template !== "paid_ad"
+      !["paid_ad", "social_content", "search_ad"].includes(
+        channel?.measurement_template ?? "",
+      )
     )
       throw new Error("광고 소재를 확인하세요.");
     let promotion = sheetPromotions(

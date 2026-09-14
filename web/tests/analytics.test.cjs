@@ -19,6 +19,146 @@ const {
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+const { rollupOptions, rollupValue } = require("../src/lib/sheet-rollup.ts");
+
+test("인스타 광고비 첫 입력은 기간 사전 설정 없이 저장 대상을 연결한다", async () => {
+  const d = fixture();
+  d.channels[0].measurement_template = "social_content";
+  d.promotions = [];
+  const result = await resolveSheetCells(
+    d,
+    [
+      {
+        kind: "cost",
+        content_id: "content",
+        promotion_id: sheetPromotions(d, "content", period)[0].id,
+        date: "2026-09-14",
+        value: 5000,
+      },
+    ],
+    async (r) => ({ ...base, ...r, id: "instagram-promo" }),
+  );
+  assert.equal(result[0].promotion_id, "instagram-promo");
+  assert.equal(result[0].value, 5000);
+});
+
+test("채널 요약은 소재별 마지막 누적값을 합치고 클릭률은 가중 계산한다", () => {
+  const d = fixture();
+  d.contents.push({ ...d.contents[0], id: "content2" });
+  d.promotions.push({
+    ...d.promotions[0],
+    id: "promo2",
+    content_id: "content2",
+  });
+  const rows = (key, scope) => [
+    row(d, key, scope),
+    {
+      ...row(d, key, scope),
+      content_id: "content2",
+      promotion_id: scope === "paid" ? "promo2" : null,
+    },
+  ];
+  for (const [content, promo, views, impressions, clicks] of [
+    ["content", "promo", 90, 100, 10],
+    ["content2", "promo2", 180, 1000, 10],
+  ]) {
+    for (const [key, scope, value, date] of [
+      ["views", "total", views + 10, "2026-09-01"],
+      ["views", "total", views, "2026-09-02"],
+      ["impressions", "paid", impressions, "2026-09-01"],
+      ["clicks", "paid", clicks, "2026-09-01"],
+    ]) {
+      d.values.push({
+        ...base,
+        id: `${content}:${key}:${date}`,
+        metric_id: d.metrics.find((m) => m.key === key && m.scope === scope).id,
+        content_id: content,
+        promotion_id: scope === "paid" ? promo : null,
+        metric_date: date,
+        value,
+      });
+    }
+  }
+  const views = rows("views", "total"),
+    ctr = rows("ctr", "paid");
+  const target = { channelId: "ch" };
+  assert.equal(
+    rollupValue(d, views, target, `metric:${views[0].metric.id}`, period),
+    270,
+  );
+  assert.equal(
+    rollupValue(d, views, target, `metric:${views[0].metric.id}`, {
+      start: "2026-09-01",
+      end: "2026-09-01",
+    }),
+    290,
+  );
+  assert.ok(
+    Math.abs(
+      rollupValue(d, ctr, target, `metric:${ctr[0].metric.id}`, period) -
+        (20 / 1100) * 100,
+    ) < 1e-10,
+  );
+  assert.equal(
+    rollupOptions([...views, ...ctr]).filter((o) => o.id.startsWith("metric:"))
+      .length,
+    2,
+  );
+});
+
+test("소재·채널 ROI는 출처별 비용과 연결 수납·원가로 계산하고 미입력은 숨긴다", () => {
+  const d = fixture();
+  d.costs = [
+    {
+      ...base,
+      ...source,
+      id: "ad",
+      promotion_id: "promo",
+      amount: 100,
+      expense_date: "2026-09-14",
+      payment_status: "paid",
+      category: "media",
+    },
+    {
+      ...base,
+      ...source,
+      id: "channel",
+      channel_id: "ch",
+      amount: 100,
+      expense_date: "2026-09-14",
+      payment_status: "paid",
+      category: "other",
+    },
+  ];
+  const target = { contentId: "content" };
+  assert.equal(rollupValue(d, [], target, "spend", period), 100);
+  assert.equal(rollupValue(d, [], target, "roi", period), null);
+  d.customers = [
+    {
+      ...base,
+      ...source,
+      id: "customer",
+      content_id: "content",
+      confidence: "direct",
+      consulted_on: "2026-09-14",
+      enrolled_on: "2026-09-14",
+    },
+  ];
+  d.payments = [
+    {
+      ...base,
+      id: "payment",
+      customer_id: "customer",
+      amount: 1000,
+      service_cost: null,
+      paid_on: "2026-09-14",
+    },
+  ];
+  assert.equal(rollupValue(d, [], target, "roi", period), null);
+  d.payments[0].service_cost = 300;
+  assert.equal(rollupValue(d, [], target, "roi", period), 600);
+  assert.equal(rollupValue(d, [], { channelId: "ch" }, "roi", period), 250);
+});
 const {
   sheetPromotions,
   resolveSheetCells,
