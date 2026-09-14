@@ -2,10 +2,18 @@ export const navigationTabs = [
   "대시보드",
   "콘텐츠",
   "이벤트",
+  "구매",
   "분석",
   "리포트",
 ];
-const routes = ["dashboard", "contents", "events", "analysis", "reports"];
+const routes = [
+  "dashboard",
+  "contents",
+  "events",
+  "purchases",
+  "analysis",
+  "reports",
+];
 export function navigationTab(hash: string) {
   return (
     navigationTabs[routes.indexOf(hash.replace(/^#/, ""))] ?? navigationTabs[0]

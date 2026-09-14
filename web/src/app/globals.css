@@ -1734,3 +1734,32 @@ textarea {
     display: none;
   }
 }
+
+.event-purchases {
+  border: 1px solid var(--border, #dce4df);
+  padding: 8px;
+  border-radius: 6px;
+  min-width: 0;
+}
+.event-purchases legend {
+  font-size: 12px;
+  font-weight: 600;
+}
+.purchase-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+.purchase-item select {
+  flex: 1;
+  min-width: 160px;
+}
+.purchase-item input {
+  width: 70px;
+}
+.purchase-item span,
+.event-purchases small {
+  font-size: 11px;
+}

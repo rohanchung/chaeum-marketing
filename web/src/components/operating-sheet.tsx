@@ -1,4 +1,6 @@
 "use client";
+import { money } from "@/lib/domain";
+import { eventCost } from "@/lib/purchases";
 import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
 import {
   CellChange,
@@ -691,12 +693,12 @@ export function OperatingSheet({
                       <button
                         key={e.id}
                         className="event-marker"
-                        title={e.title}
+                        title={`${e.title} · 원가 ${money(eventCost(data, e.id).total)}`}
                         onClick={() =>
                           onEdit({ collection: "events", record: e })
                         }
                       >
-                        {e.title}
+                        {e.title} · {money(eventCost(data, e.id).total)}
                       </button>
                     ))}
                 </td>

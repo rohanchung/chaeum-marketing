@@ -48,6 +48,18 @@ export type MarketingEvent = Base & {
   status: string;
   event_type: string;
 };
+export type Purchase = Base & {
+  title: string;
+  purchased_on: string;
+  quantity: number;
+  total_amount: number;
+  notes: string | null;
+};
+export type EventItem = Base & {
+  event_id: string;
+  purchase_id: string;
+  quantity: number;
+};
 export type Metric = Base & {
   include_in_marketing?: boolean;
   funnel_role?: "inflows" | "consultations" | "enrollments" | null;
@@ -79,6 +91,7 @@ export type Source = {
 export type Cost = Base &
   Source & {
     metric_value_id?: string;
+    purchase_id?: string;
     expense_date: string;
     category: string;
     amount: number;
@@ -118,6 +131,8 @@ export type Data = {
   metrics: Metric[];
   values: Observation[];
   events: MarketingEvent[];
+  purchases: Purchase[];
+  eventItems: EventItem[];
   costs: Cost[];
   customers: Customer[];
   payments: Payment[];
@@ -130,6 +145,8 @@ export const emptyData: Data = {
   metrics: [],
   values: [],
   events: [],
+  purchases: [],
+  eventItems: [],
   costs: [],
   customers: [],
   payments: [],

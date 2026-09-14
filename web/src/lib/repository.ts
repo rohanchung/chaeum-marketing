@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { CellChange, Channel, Data, Metric, metricTemplate } from "./domain";
 import { withMetricCosts } from "./metric-costs";
+import { withPurchaseCosts } from "./purchases";
 export const tables = {
   channels: "channels",
   contents: "contents",
@@ -8,6 +9,8 @@ export const tables = {
   metrics: "mkt_metrics",
   values: "mkt_values",
   events: "marketing_events",
+  purchases: "mkt_purchases",
+  eventItems: "mkt_event_items",
   costs: "mkt_costs",
   customers: "mkt_customers",
   payments: "mkt_payments",
@@ -36,7 +39,21 @@ export async function loadData(workspace: string): Promise<Data> {
       await fetchRows(table, workspace),
     ]),
   );
-  return withMetricCosts(Object.fromEntries(entries) as Data);
+  return withPurchaseCosts(
+    withMetricCosts(Object.fromEntries(entries) as Data),
+  );
+}
+export async function saveEvent(
+  workspace: string,
+  record: Record<string, unknown>,
+) {
+  const { items, ...event } = record;
+  const { error } = await supabase.rpc("mkt_save_event_with_items", {
+    p_workspace: workspace,
+    p_event: event,
+    p_items: items,
+  });
+  if (error) throw new Error(error.message);
 }
 export async function saveRecord(
   workspace: string,

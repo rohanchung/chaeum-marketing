@@ -19,6 +19,113 @@ const {
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+const {
+  withPurchaseCosts,
+  eventCost,
+  usedQuantity,
+} = require("../src/lib/purchases.ts");
+test("구매 지출과 이벤트 사용 원가를 중복 없이 집계한다", () => {
+  const d = structuredClone(emptyData);
+  d.purchases.push({
+    ...base,
+    id: "pens",
+    title: "볼펜",
+    purchased_on: "2026-09-01",
+    quantity: 500,
+    total_amount: 100000,
+  });
+  d.events.push({
+    ...base,
+    id: "event",
+    title: "설명회",
+    starts_at: "2026-09-10T00:00:00+09:00",
+  });
+  d.eventItems.push({
+    ...base,
+    id: "usage",
+    event_id: "event",
+    purchase_id: "pens",
+    quantity: 150,
+  });
+  d.costs.push({
+    ...base,
+    id: "venue",
+    event_id: "event",
+    expense_date: "2026-09-10",
+    payment_status: "paid",
+    amount: 50000,
+  });
+  const loaded = withPurchaseCosts(withPurchaseCosts(d));
+  assert.equal(loaded.costs.length, 2);
+  assert.equal(summary(loaded, period).spend, 150000);
+  assert.deepEqual(eventCost(loaded, "event"), {
+    goods: 30000,
+    direct: 50000,
+    total: 80000,
+  });
+  assert.equal(usedQuantity(loaded, "pens"), 150);
+  assert.equal(usedQuantity(loaded, "pens", "event"), 0);
+  assert.equal(
+    report(loaded, period).activities.find((a) => a.id === "event").spend,
+    80000,
+  );
+  assert.equal(report(loaded, period).summary.spend, 150000);
+});
+test("구매월과 사용월이 달라도 지출과 이벤트 원가를 구분한다", () => {
+  const d = structuredClone(emptyData);
+  d.purchases.push({
+    ...base,
+    id: "lot",
+    title: "리플렛",
+    purchased_on: "2026-08-01",
+    quantity: 300,
+    total_amount: 10000,
+  });
+  d.events.push({
+    ...base,
+    id: "e",
+    title: "설명회",
+    starts_at: "2026-09-10T00:00:00+09:00",
+  });
+  d.eventItems.push({
+    ...base,
+    id: "i",
+    event_id: "e",
+    purchase_id: "lot",
+    quantity: 30,
+  });
+  const loaded = withPurchaseCosts(d);
+  assert.equal(summary(loaded, period).spend, 0);
+  assert.ok(Math.abs(eventCost(loaded, "e").goods - 1000) < 0.001);
+  assert.ok(
+    Math.abs(
+      report(loaded, period).activities.find((a) => a.id === "e").spend - 1000,
+    ) < 0.001,
+  );
+  assert.equal(
+    summary(loaded, { start: "2026-01-01", end: "2026-12-31" }).spend,
+    10000,
+  );
+});
+test("구매 건별 단가와 반납 수량, 삭제한 이벤트의 사용량을 보존한다", () => {
+  const d = structuredClone(emptyData);
+  d.purchases.push(
+    { ...base, id: "a", quantity: 100, total_amount: 10000 },
+    { ...base, id: "b", quantity: 100, total_amount: 20000 },
+  );
+  d.events.push({ ...base, id: "e", deleted_at: "2026-09-11" });
+  d.eventItems.push(
+    { ...base, id: "x", event_id: "e", purchase_id: "a", quantity: 10 },
+    { ...base, id: "y", event_id: "e", purchase_id: "b", quantity: 20 },
+  );
+  assert.equal(eventCost(d, "e").goods, 5000);
+  assert.equal(usedQuantity(d, "a"), 10);
+  d.eventItems[0].quantity = 5;
+  assert.equal(eventCost(d, "e").goods, 4500);
+  d.eventItems[1].deleted_at = "2026-09-11";
+  assert.equal(usedQuantity(d, "b"), 0);
+  assert.equal(eventCost(d, "e").goods, 500);
+});
 test("소재 없는 채널 지표는 일별·월간 보고서에 표시되고 소재에 중복되지 않는다", () => {
   const d = fixture();
   const { metricsForContent } = require("../src/lib/domain.ts");

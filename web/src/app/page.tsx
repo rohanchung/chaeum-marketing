@@ -33,6 +33,7 @@ import { report, sourceName } from "@/lib/analytics";
 import {
   Collection,
   saveChannel,
+  saveEvent,
   saveAdContent,
   downloadJSON,
   exportBackup,
@@ -50,9 +51,10 @@ import { useServerDate } from "@/components/use-server-date";
 import { resolveSheetCells } from "@/lib/sheet-ad";
 import { moveMetric } from "@/lib/metric-order";
 import { moveChannel } from "@/lib/channel-order";
+import { eventCost, unitCost, usedQuantity } from "@/lib/purchases";
 import { useNavigation } from "@/components/use-navigation";
 
-const tabs = ["대시보드", "콘텐츠", "이벤트", "분석", "리포트"];
+const tabs = ["대시보드", "콘텐츠", "이벤트", "구매", "분석", "리포트"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
 export default function Home() {
   const [workspace, setWorkspace] = useState<string | null>(null);
@@ -242,6 +244,7 @@ export default function Home() {
         await saveChannel(workspace, record);
       else if (collection === "contents" && record.initial_promotion)
         await saveAdContent(workspace, record);
+      else if (collection === "events") await saveEvent(workspace, record);
       else await saveRecord(workspace, collection, record);
       await refresh(workspace);
       setNotice("저장했습니다.");
@@ -867,6 +870,94 @@ export default function Home() {
                 </section>
               </>
             )}
+            {nav === "구매" && (
+              <>
+                <PageTitle
+                  eyebrow="PURCHASES"
+                  title="구매 목록"
+                  detail="전체 구매 건 · 결제액은 구매일의 마케팅 비용에 반영됩니다."
+                  action={
+                    <button
+                      className="primary"
+                      onClick={() => edit({ collection: "purchases" })}
+                    >
+                      ＋ 구매
+                    </button>
+                  }
+                />
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={lifecycle === "trash"}
+                    onChange={(e) =>
+                      setLifecycle(e.target.checked ? "trash" : "active")
+                    }
+                  />
+                  휴지통 보기
+                </label>
+                <DataTable
+                  headers={[
+                    "구매일",
+                    "물품",
+                    "수량",
+                    "총 결제액",
+                    "개당 원가",
+                    "사용",
+                    "잔량",
+                    "사용 이벤트",
+                    "메모",
+                    "관리",
+                  ]}
+                  rows={data.purchases
+                    .filter(show)
+                    .sort((a, b) =>
+                      b.purchased_on.localeCompare(a.purchased_on),
+                    )
+                    .map((p) => [
+                      p.purchased_on,
+                      p.title,
+                      number(p.quantity),
+                      money(p.total_amount),
+                      money(unitCost(p)),
+                      number(usedQuantity(data, p.id)),
+                      number(p.quantity - usedQuantity(data, p.id)),
+                      <span key="usage">
+                        {data.eventItems
+                          .filter(
+                            (i) => !i.deleted_at && i.purchase_id === p.id,
+                          )
+                          .map((i) => {
+                            const e = data.events.find(
+                              (e) => e.id === i.event_id,
+                            );
+                            return (
+                              <button
+                                key={i.id}
+                                onClick={() =>
+                                  e &&
+                                  edit({
+                                    collection: "events",
+                                    record: objectRecord(e),
+                                  })
+                                }
+                              >
+                                {e?.title ?? "이벤트"}
+                                {e?.deleted_at ? " (휴지통)" : ""} ·{" "}
+                                {number(i.quantity)}개
+                              </button>
+                            );
+                          })}
+                      </span>,
+                      p.notes || "—",
+                      lifecycleActions("purchases", p),
+                    ])}
+                />
+                <p className="form-note">
+                  이벤트에서 구매 건과 사용 수량을 연결하면 물품 원가가
+                  계산됩니다. 사용 원가는 마케팅 지출에 중복 합산하지 않습니다.
+                </p>
+              </>
+            )}
             {nav === "이벤트" && (
               <>
                 <PageTitle
@@ -914,18 +1005,9 @@ export default function Home() {
                           </p>
                           <p>{e.notes || "결과 메모를 남겨보세요."}</p>
                           <small>
-                            기간 지급 비용{" "}
-                            {money(
-                              data.costs
-                                .filter(
-                                  (c) =>
-                                    c.event_id === e.id &&
-                                    !c.deleted_at &&
-                                    c.payment_status === "paid" &&
-                                    inPeriod(c.expense_date, period),
-                                )
-                                .reduce((a, c) => a + c.amount, 0),
-                            )}
+                            이벤트 원가 {money(eventCost(data, e.id).total)} ·
+                            물품 {money(eventCost(data, e.id).goods)} + 직접
+                            지급 {money(eventCost(data, e.id).direct)}
                           </small>
                         </div>
                         <div>
@@ -1035,7 +1117,23 @@ export default function Home() {
                               ? "계획"
                               : "취소",
                         money(c.amount),
-                        c.metric_value_id ? (
+                        c.purchase_id ? (
+                          <button
+                            key="purchase"
+                            onClick={() => {
+                              const p = data.purchases.find(
+                                (p) => p.id === c.purchase_id,
+                              );
+                              if (p)
+                                edit({
+                                  collection: "purchases",
+                                  record: objectRecord(p),
+                                });
+                            }}
+                          >
+                            구매 수정
+                          </button>
+                        ) : c.metric_value_id ? (
                           <button
                             key="edit"
                             onClick={() => {
@@ -1365,7 +1463,8 @@ export default function Home() {
                 <div key={e.id} className="event-day-item">
                   <span>
                     {e.title}
-                    {e.location ? ` · ${e.location}` : ""}
+                    {e.location ? ` · ${e.location}` : ""} · 원가{" "}
+                    {money(eventCost(data, e.id).total)}
                   </span>
                   {lifecycleActions("events", e)}
                 </div>

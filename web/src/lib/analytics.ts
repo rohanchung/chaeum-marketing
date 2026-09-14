@@ -1,3 +1,4 @@
+import { eventUsageCosts } from "./purchases";
 import {
   Activity,
   Cost,
@@ -287,7 +288,10 @@ export function report(d: Data, p: Period, annual = false): Report {
         e.id,
         e.title,
         "이벤트",
-        d.costs.filter((c) => c.event_id === e.id),
+        [
+          ...d.costs.filter((c) => c.event_id === e.id),
+          ...eventUsageCosts(d, e),
+        ],
         confirmedCustomers.filter((c) => c.event_id === e.id),
       ),
     ),
@@ -452,6 +456,7 @@ export function report(d: Data, p: Period, annual = false): Report {
     trend,
     metrics,
     notes: [
+      "구매 결제액은 구매일의 전체 지출에 한 번 반영합니다. 이벤트별 비용은 직접 지급액과 시작일 기준 사용 물품 원가이며, 전체 지출에 다시 더하지 않습니다.",
       "기간은 한국시간, 비용은 지급일, 매출은 실제 결제일 기준입니다. 빈 값은 미입력이며 0과 다릅니다.",
       "일일 학원 집계와 고객별 기록을 합산하지 않습니다. 고객별 출처 확인 기록은 전체의 일부일 수 있습니다.",
       "채널·소재·집행은 상하위 관계입니다. 활동별 행을 다시 합산하지 마세요. 광고 포함 전체 성과와 광고 성과도 합산하지 않습니다.",

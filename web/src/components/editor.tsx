@@ -12,6 +12,7 @@ import {
 } from "@/lib/domain";
 import { Collection } from "@/lib/repository";
 import { CarrotGuide } from "./carrot-guide";
+import { EventPurchases, ItemSelection } from "./event-purchases";
 export type EditorState = {
   collection: Collection;
   record?: Record<string, unknown>;
@@ -20,6 +21,7 @@ export const titles: Partial<Record<Collection, string>> = {
   channels: "채널",
   contents: "소재",
   events: "이벤트",
+  purchases: "구매",
   promotions: "광고 집행",
   metrics: "지표",
   values: "비용 지표 금액",
@@ -109,6 +111,11 @@ export function Editor({
   const { collection, record: r = {} } = state;
   const form = useRef<HTMLFormElement>(null);
   const [error, setError] = useState("");
+  const [items, setItems] = useState<ItemSelection[]>(() =>
+    data.eventItems
+      .filter((i) => !i.deleted_at && i.event_id === r.id)
+      .map((i) => ({ purchase_id: i.purchase_id, quantity: i.quantity })),
+  );
   const [metricScope, setMetricScope] = useState(
     String(r.scope ?? (r.channel_id ? "total" : "funnel")),
   );
@@ -225,7 +232,28 @@ export function Editor({
           location: nullable("location"),
           status: get("status"),
           event_type: "other",
+          items,
         };
+      if (collection === "purchases") {
+        const quantity = Number(get("quantity")),
+          total = Number(get("total_amount"));
+        if (
+          !Number.isInteger(quantity) ||
+          quantity <= 0 ||
+          !Number.isFinite(total) ||
+          total < 0
+        )
+          throw new Error(
+            "구매 수량은 1 이상의 정수, 결제액은 0 이상으로 입력하세요.",
+          );
+        patch = {
+          ...patch,
+          title: get("title"),
+          purchased_on: get("purchased_on"),
+          quantity,
+          total_amount: total,
+        };
+      }
       if (collection === "promotions")
         patch = {
           ...patch,
@@ -451,6 +479,30 @@ export function Editor({
               {channelTemplate === "paid_ad" && <CarrotGuide />}
             </>
           )}
+          {collection === "purchases" && (
+            <>
+              <Field label="물품명">{input("title", "text", true)}</Field>
+              <Field label="구매·결제일">
+                {input("purchased_on", "date", true, today)}
+              </Field>
+              <div className="form-pair">
+                <Field label="구매 수량">
+                  {input("quantity", "number", true, "", { min: 1, step: 1 })}
+                </Field>
+                <Field label="총 결제액 (원)">
+                  {input("total_amount", "number", true, "", {
+                    min: 0,
+                    step: "0.01",
+                  })}
+                </Field>
+              </div>
+              <p className="form-note">
+                배송비·제작비를 포함한 실제 결제액을 입력하세요. 단가는 자동
+                계산하며, 이 금액은 결제일의 마케팅 비용에 한 번 반영됩니다.
+                비용 원장에 별도로 입력하지 마세요.
+              </p>
+            </>
+          )}
           {collection === "events" && (
             <>
               <Field label="이벤트 이름">{input("title", "text", true)}</Field>
@@ -481,6 +533,14 @@ export function Editor({
                 </select>
               </Field>
             </>
+          )}
+          {collection === "events" && (
+            <EventPurchases
+              data={data}
+              eventId={r.id as string | undefined}
+              items={items}
+              onChange={setItems}
+            />
           )}
           {collection === "promotions" && (
             <>
