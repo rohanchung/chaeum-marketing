@@ -120,7 +120,7 @@ export function downloadExcelReport(r: Report) {
       m.observedOn,
     ]),
   ]);
-  XLSX.writeFile(wb, `채움_마케팅_${r.period.start}_${r.period.end}.xlsx`);
+  XLSX.writeFile(wb, `로한_마케팅_${r.period.start}_${r.period.end}.xlsx`);
 }
 const esc = (v: unknown) =>
   String(v ?? "—").replace(
@@ -143,7 +143,7 @@ export function printableHTML(r: Report) {
         `<div class="barrow"><span>${esc(t.date)}</span><div><i style="width:${(100 * t.spend) / max}%;background:#ba793a"></i><i style="width:${(100 * Math.abs(t.revenue ?? 0)) / max}%;background:${(t.revenue ?? 0) < 0 ? "#b34242" : "#247a58"}"></i></div><small>${esc(money(t.spend))} / ${esc(money(t.revenue))}${(t.revenue ?? 0) < 0 ? " (순환불)" : ""}</small></div>`,
     )
     .join("");
-  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>채움 마케팅 보고서</title><style>body{font:12px Arial,'Malgun Gothic',sans-serif;color:#243b32;margin:28px}h1{font-size:26px}h2{font-size:17px;margin-top:28px}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}th{background:#ecf4ef}tr{break-inside:avoid}small{color:#576b60}.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.card{padding:14px;border:1px solid #ddd;border-radius:8px}.card strong{display:block;font-size:18px;margin-top:8px}.barrow{display:grid;grid-template-columns:95px 1fr 190px;gap:10px;margin:6px 0}.barrow i{display:block;height:5px;min-width:0;margin:2px 0}@page{size:A4 landscape;margin:12mm} @media print{button{display:none}thead{display:table-header-group}}</style></head><body><button onclick="window.print()">인쇄 / PDF로 저장</button><h1>채움 마케팅 · 기간 보고서</h1><p>${esc(r.period.start)} ~ ${esc(r.period.end)} · 생성 ${esc(r.generatedAt)}</p><div class="cards">${summaryRows(
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>로한 마케팅 보고서</title><style>body{font:12px Arial,'Malgun Gothic',sans-serif;color:#243b32;margin:28px}h1{font-size:26px}h2{font-size:17px;margin-top:28px}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}th{background:#ecf4ef}tr{break-inside:avoid}small{color:#576b60}.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.card{padding:14px;border:1px solid #ddd;border-radius:8px}.card strong{display:block;font-size:18px;margin-top:8px}.barrow{display:grid;grid-template-columns:95px 1fr 190px;gap:10px;margin:6px 0}.barrow i{display:block;height:5px;min-width:0;margin:2px 0}@page{size:A4 landscape;margin:12mm} @media print{button{display:none}thead{display:table-header-group}}</style></head><body><button onclick="window.print()">인쇄 / PDF로 저장</button><h1>로한 마케팅 · 기간 보고서</h1><p>${esc(r.period.start)} ~ ${esc(r.period.end)} · 생성 ${esc(r.generatedAt)}</p><div class="cards">${summaryRows(
     r,
   )
     .map(

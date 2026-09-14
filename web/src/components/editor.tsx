@@ -350,7 +350,7 @@ export function Editor({
       >
         <header>
           <div>
-            <small>채움 마케팅</small>
+            <small>로한 마케팅</small>
             <h2 id="editor-title">
               {titles[collection]} {r.id ? "수정" : "추가"}
             </h2>

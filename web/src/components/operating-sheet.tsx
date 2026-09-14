@@ -708,9 +708,33 @@ export function OperatingSheet({
                   : (options.find((o) => o.id === selected)?.unit ?? "");
               const ri = editable.findIndex((e) => e.id === r.id);
               const aggregate = row ? metricValue(data, row, period) : null;
+              const channel = data.channels.find(
+                (ch) => ch.id === r.id || r.parentIds.includes(ch.id),
+              );
+              const color =
+                channel && /^#[0-9a-f]{6}$/i.test(channel.color ?? "")
+                  ? channel.color!
+                  : "#287a56";
+              const tint = row
+                ? 5
+                : r.depth === 0
+                  ? 22
+                  : r.depth === 1
+                    ? 12
+                    : 8;
               return (
                 <tr
                   key={r.id}
+                  data-channel-color={channel ? "true" : undefined}
+                  style={
+                    channel
+                      ? ({
+                          "--channel-color": color,
+                          "--row-tint": `${tint}%`,
+                          "--today-tint": `${tint + 8}%`,
+                        } as CSSProperties)
+                      : undefined
+                  }
                   className={
                     row || r.fixedRollup
                       ? "metric-row"

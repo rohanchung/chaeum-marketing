@@ -385,7 +385,7 @@ export default function Home() {
   if (initializing)
     return (
       <main className="loading-screen">
-        <div className="brand-mark">채</div>
+        <BrandMark />
         <p>운영 기록을 불러오는 중입니다…</p>
       </main>
     );
@@ -393,8 +393,8 @@ export default function Home() {
     return (
       <main className="login-screen">
         <section>
-          <div className="brand-mark">채</div>
-          <small>CHAEUM MARKETING</small>
+          <BrandMark />
+          <small>ROHAN MARKETING</small>
           <h1>
             매일의 기록이
             <br />
@@ -436,9 +436,9 @@ export default function Home() {
     <main className="app">
       <header className="topbar">
         <button className="brand" onClick={() => setNav("대시보드")}>
-          <span className="brand-mark">채</span>
+          <BrandMark />
           <span>
-            채움 <b>마케팅</b>
+            로한 <b>마케팅</b>
           </span>
         </button>
         <nav aria-label="주 메뉴">
@@ -1215,7 +1215,7 @@ export default function Home() {
                         fire(async () =>
                           downloadJSON(
                             await exportBackup(workspace),
-                            `채움_전체백업_${localDate()}.json`,
+                            `로한마케팅_전체백업_${localDate()}.json`,
                           ),
                         )
                       }
@@ -1255,14 +1255,35 @@ export default function Home() {
                             return;
                           downloadJSON(
                             await exportBackup(workspace),
-                            `채움_복원직전_${Date.now()}.json`,
+                            `로한마케팅_복원직전_${Date.now()}.json`,
                           );
                           if (Array.isArray(backup.tables.mkt_metrics)) {
-                            backup.tables.mkt_metrics = backup.tables.mkt_metrics.map((m: Record<string, unknown>) => {
-                              const current = stateRef.current.metrics.find(x => x.id === m.id);
-                              return { include_in_marketing: current?.include_in_marketing ?? false,
-                                funnel_role: current?.funnel_role ?? (m.scope === "funnel" ? ["kakao", "phone", "visit"].includes(String(m.key)) ? "consultations" : ["inflows", "enrollments"].includes(String(m.key)) ? m.key : null : null), ...m };
-                            });
+                            backup.tables.mkt_metrics =
+                              backup.tables.mkt_metrics.map(
+                                (m: Record<string, unknown>) => {
+                                  const current = stateRef.current.metrics.find(
+                                    (x) => x.id === m.id,
+                                  );
+                                  return {
+                                    include_in_marketing:
+                                      current?.include_in_marketing ?? false,
+                                    funnel_role:
+                                      current?.funnel_role ??
+                                      (m.scope === "funnel"
+                                        ? ["kakao", "phone", "visit"].includes(
+                                            String(m.key),
+                                          )
+                                          ? "consultations"
+                                          : ["inflows", "enrollments"].includes(
+                                                String(m.key),
+                                              )
+                                            ? m.key
+                                            : null
+                                        : null),
+                                    ...m,
+                                  };
+                                },
+                              );
                           }
                           const { error } = await supabase.rpc(
                             "mkt_restore_backup",
@@ -1438,6 +1459,22 @@ export default function Home() {
   );
 }
 
+function BrandMark() {
+  return (
+    <span className="brand-mark" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 64 64">
+        <path
+          d="M15 46V19l17 18 17-18v27"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+  );
+}
 function Empty({ title, detail }: { title: string; detail: string }) {
   return (
     <div className="empty">

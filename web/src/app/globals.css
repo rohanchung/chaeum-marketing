@@ -939,6 +939,29 @@ a:hover {
   font-size: 11px;
   line-height: 14px;
 }
+.operating-sheet tr[data-channel-color] > th,
+.operating-sheet tr[data-channel-color] > td {
+  background: color-mix(in srgb, var(--channel-color) var(--row-tint), white);
+}
+.operating-sheet tr[data-channel-color] > td.today-col {
+  background: color-mix(in srgb, var(--channel-color) var(--today-tint), white);
+}
+.operating-sheet tr[data-channel-color] > td.out-of-period {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 5px,
+    #00000004 5px,
+    #00000004 6px
+  );
+}
+.operating-sheet tr[data-channel-color] > th.label-col {
+  border-left: 3px solid var(--channel-color);
+}
+.operating-sheet tr[data-channel-color] td input:focus:not(.cell-error) {
+  background: color-mix(in srgb, var(--channel-color) 15%, white);
+  outline-color: var(--channel-color);
+}
 .event-marker {
   display: block;
   max-width: 60px;
