@@ -4,6 +4,7 @@ export type Base = {
   deleted_at: string | null;
 };
 export type Channel = Base & {
+  sort_order?: number;
   name: string;
   color: string | null;
   measurement_template: string;

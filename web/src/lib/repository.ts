@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { CellChange, Data, Metric, metricTemplate } from "./domain";
+import { CellChange, Channel, Data, Metric, metricTemplate } from "./domain";
 import { withMetricCosts } from "./metric-costs";
 export const tables = {
   channels: "channels",
@@ -94,6 +94,22 @@ export async function saveMetricOrder(workspace: string, metrics: Metric[]) {
       deleted_at: m.deleted_at,
       include_in_marketing: m.include_in_marketing ?? false,
       funnel_role: m.funnel_role ?? null,
+    })),
+  );
+  if (error) throw new Error(error.message);
+}
+export async function saveChannelOrder(workspace: string, channels: Channel[]) {
+  if (!channels.length) return;
+  const { error } = await supabase.from("channels").upsert(
+    channels.map((c) => ({
+      id: c.id,
+      workspace_id: workspace,
+      name: c.name,
+      color: c.color,
+      measurement_template: c.measurement_template,
+      is_active: c.is_active,
+      deleted_at: c.deleted_at,
+      sort_order: c.sort_order,
     })),
   );
   if (error) throw new Error(error.message);

@@ -19,6 +19,7 @@ import { RollupTarget, rollupOptions, rollupValue } from "@/lib/sheet-rollup";
 import { isEventChannel, sheetPromotions } from "@/lib/sheet-ad";
 import { EditorState } from "./editor";
 import { compareMetrics, metricGroup } from "@/lib/metric-order";
+import { orderedChannels } from "@/lib/channel-order";
 type DisplayRow = {
   id: string;
   label: string;
@@ -144,6 +145,7 @@ export function OperatingSheet({
   period,
   onEdit,
   onSave,
+  onChannelMove,
   onMetricMove,
   onMetricDelete,
   onDate,
@@ -156,6 +158,11 @@ export function OperatingSheet({
   period: Period;
   onEdit: (state: EditorState) => void;
   onSave: (cells: CellChange[]) => Promise<void>;
+  onChannelMove: (
+    id: string,
+    target: string,
+    position: "before" | "after",
+  ) => Promise<void>;
   onMetricMove: (id: string, direction: -1 | 1) => Promise<void>;
   onMetricDelete: (id: string, deleted: boolean) => Promise<void>;
   onDate: (date: string) => void;
@@ -165,6 +172,27 @@ export function OperatingSheet({
   actions?: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<{
+    id: string;
+    position: "before" | "after";
+  } | null>(null);
+  const [channelBusy, setChannelBusy] = useState(false);
+  const sortedChannels = orderedChannels(data.channels).filter(
+    (ch) => !ch.deleted_at && !isEventChannel(ch),
+  );
+  const reorderChannel = (
+    id: string,
+    target: string,
+    position: "before" | "after",
+  ) => {
+    setDragging(null);
+    setDropAt(null);
+    setChannelBusy(true);
+    void onChannelMove(id, target, position)
+      .catch(() => {})
+      .finally(() => setChannelBusy(false));
+  };
   const [metricBusy, setMetricBusy] = useState(false);
   const widthKey = "marketing-sheet-widths";
   type Column = "label" | "summary";
@@ -317,128 +345,126 @@ export function OperatingSheet({
     1,
     ["funnel"],
   );
-  data.channels
-    .filter((ch) => !ch.deleted_at && !isEventChannel(ch))
-    .forEach((ch) => {
+  sortedChannels.forEach((ch) => {
+    rows.push({
+      id: ch.id,
+      label: ch.name,
+      depth: 0,
+      parentIds: [],
+      detail: "채널",
+      rollup: { channelId: ch.id },
+      edit: { collection: "channels", record: ch },
+      add: { collection: "contents", record: { channel_id: ch.id } },
+    });
+    const contents = data.contents
+      .filter(
+        (c) =>
+          c.channel_id === ch.id &&
+          !c.deleted_at &&
+          (includeArchive || c.status !== "archived"),
+      )
+      .sort(
+        (a, b) => Number(isBusinessProfile(b)) - Number(isBusinessProfile(a)),
+      );
+    contents.forEach((c) => {
       rows.push({
-        id: ch.id,
-        label: ch.name,
-        depth: 0,
-        parentIds: [],
-        detail: "채널",
-        rollup: { channelId: ch.id },
-        edit: { collection: "channels", record: ch },
-        add: { collection: "contents", record: { channel_id: ch.id } },
+        id: c.id,
+        label: c.title,
+        depth: 1,
+        parentIds: [ch.id],
+        rollup: { contentId: c.id },
+        finance: !isBusinessProfile(c),
+        detail: `${c.status === "archived" ? "아카이브 · " : ""}${datePart(c.published_at) || "발행일 미입력"}`,
+        edit: { collection: "contents", record: c },
+        add: isBusinessProfile(c)
+          ? undefined
+          : { collection: "promotions", record: { content_id: c.id } },
       });
-      const contents = data.contents
-        .filter(
-          (c) =>
-            c.channel_id === ch.id &&
-            !c.deleted_at &&
-            (includeArchive || c.status !== "archived"),
-        )
-        .sort(
-          (a, b) => Number(isBusinessProfile(b)) - Number(isBusinessProfile(a)),
-        );
-      contents.forEach((c) => {
-        rows.push({
-          id: c.id,
-          label: c.title,
-          depth: 1,
-          parentIds: [ch.id],
-          rollup: { contentId: c.id },
-          finance: !isBusinessProfile(c),
-          detail: `${c.status === "archived" ? "아카이브 · " : ""}${datePart(c.published_at) || "발행일 미입력"}`,
-          edit: { collection: "contents", record: c },
-          add: isBusinessProfile(c)
-            ? undefined
-            : { collection: "promotions", record: { content_id: c.id } },
-        });
-        const ms = metricsForContent(data.metrics, c);
-        metricRows(
-          ms.filter((m) => m.scope !== "paid"),
-          c.id,
-          null,
-          2,
-          [ch.id, c.id],
-        );
-        if (isBusinessProfile(c)) return;
-        const directAd = ["paid_ad", "social_content", "search_ad"].includes(
-          ch.measurement_template,
-        );
-        const promotions = directAd
-          ? sheetPromotions(data, c.id, period)
-          : data.promotions.filter(
-              (p) =>
-                p.content_id === c.id &&
-                !p.deleted_at &&
-                p.start_date <= period.end &&
-                p.end_date >= period.start,
-            );
-        if (ms.some((m) => m.scope === "paid") && promotions.length === 0) {
-          const hasPrevious = data.promotions.some(
-            (p) => p.content_id === c.id && !p.deleted_at,
+      const ms = metricsForContent(data.metrics, c);
+      metricRows(
+        ms.filter((m) => m.scope !== "paid"),
+        c.id,
+        null,
+        2,
+        [ch.id, c.id],
+      );
+      if (isBusinessProfile(c)) return;
+      const directAd = ["paid_ad", "social_content", "search_ad"].includes(
+        ch.measurement_template,
+      );
+      const promotions = directAd
+        ? sheetPromotions(data, c.id, period)
+        : data.promotions.filter(
+            (p) =>
+              p.content_id === c.id &&
+              !p.deleted_at &&
+              p.start_date <= period.end &&
+              p.end_date >= period.start,
           );
+      if (ms.some((m) => m.scope === "paid") && promotions.length === 0) {
+        const hasPrevious = data.promotions.some(
+          (p) => p.content_id === c.id && !p.deleted_at,
+        );
+        rows.push({
+          id: `setup:${c.id}`,
+          label: hasPrevious
+            ? "이 달 광고 없음 · 집행 추가"
+            : "광고 지표 입력 · 기간 설정",
+          depth: 2,
+          parentIds: [ch.id, c.id],
+          detail: "노출 · 클릭 · 반응 · 지출 / 클릭률 자동 계산",
+          edit: {
+            collection: "promotions",
+            record: { content_id: c.id, start_date: today, end_date: today },
+          },
+        });
+      }
+      promotions.forEach((p) => {
+        if (!directAd || promotions.length > 1)
           rows.push({
-            id: `setup:${c.id}`,
-            label: hasPrevious
-              ? "이 달 광고 없음 · 집행 추가"
-              : "광고 지표 입력 · 기간 설정",
+            id: p.id,
+            label: p.title,
             depth: 2,
             parentIds: [ch.id, c.id],
-            detail: "노출 · 클릭 · 반응 · 지출 / 클릭률 자동 계산",
-            edit: {
-              collection: "promotions",
-              record: { content_id: c.id, start_date: today, end_date: today },
-            },
+            detail: `광고 · ${p.start_date} ~ ${p.end_date}`,
+            edit: p.id.startsWith("sheet:")
+              ? undefined
+              : { collection: "promotions", record: p },
           });
-        }
-        promotions.forEach((p) => {
-          if (!directAd || promotions.length > 1)
-            rows.push({
-              id: p.id,
-              label: p.title,
-              depth: 2,
-              parentIds: [ch.id, c.id],
-              detail: `광고 · ${p.start_date} ~ ${p.end_date}`,
-              edit: p.id.startsWith("sheet:")
-                ? undefined
-                : { collection: "promotions", record: p },
-            });
-          metricRows(
-            ms.filter((m) => m.scope === "paid"),
-            c.id,
-            p.id,
-            directAd && promotions.length === 1 ? 2 : 3,
+        metricRows(
+          ms.filter((m) => m.scope === "paid"),
+          c.id,
+          p.id,
+          directAd && promotions.length === 1 ? 2 : 3,
+          directAd && promotions.length === 1
+            ? [ch.id, c.id]
+            : [ch.id, c.id, p.id],
+          p.start_date,
+          p.end_date,
+        );
+        rows.push({
+          id: `cost:${directAd && promotions.length === 1 ? c.id : p.id}`,
+          label: ch.measurement_template === "paid_ad" ? "지출" : "광고비",
+          depth: directAd && promotions.length === 1 ? 2 : 3,
+          parentIds:
             directAd && promotions.length === 1
               ? [ch.id, c.id]
               : [ch.id, c.id, p.id],
-            p.start_date,
-            p.end_date,
-          );
-          rows.push({
-            id: `cost:${directAd && promotions.length === 1 ? c.id : p.id}`,
+          detail: "비용 원장 · 지급액",
+          metricRow: {
+            id: p.id,
             label: ch.measurement_template === "paid_ad" ? "지출" : "광고비",
-            depth: directAd && promotions.length === 1 ? 2 : 3,
-            parentIds:
-              directAd && promotions.length === 1
-                ? [ch.id, c.id]
-                : [ch.id, c.id, p.id],
-            detail: "비용 원장 · 지급액",
-            metricRow: {
-              id: p.id,
-              label: ch.measurement_template === "paid_ad" ? "지출" : "광고비",
-              kind: "cost",
-              metric: null,
-              content_id: c.id,
-              promotion_id: p.id,
-              start: p.start_date,
-              end: p.end_date,
-            },
-          });
+            kind: "cost",
+            metric: null,
+            content_id: c.id,
+            promotion_id: p.id,
+            start: p.start_date,
+            end: p.end_date,
+          },
         });
       });
     });
+  });
   const academyRows: DisplayRow[] = [
     { id: "academy", label: "학원 전체 마케팅 성과", depth: 0, parentIds: [] },
   ];
@@ -459,19 +485,7 @@ export function OperatingSheet({
       fixedUnit: unit,
     });
   }
-  const instagram = data.channels.find(
-    (ch) => ch.measurement_template === "social_content" && !ch.deleted_at,
-  );
-  const lastInstagram = instagram
-    ? rows.findLastIndex(
-        (r) => r.id === instagram.id || r.parentIds.includes(instagram.id),
-      )
-    : -1;
-  rows.splice(
-    lastInstagram < 0 ? rows.length : lastInstagram + 1,
-    0,
-    ...academyRows,
-  );
+  rows.push(...academyRows);
   const visible = rows.filter((r) => !r.parentIds.some(isCollapsed));
   const editable = visible.filter(
     (r) => r.metricRow && r.metricRow.metric?.mode !== "ratio",
@@ -725,6 +739,36 @@ export function OperatingSheet({
               return (
                 <tr
                   key={r.id}
+                  data-drop={dropAt?.id === r.id ? dropAt.position : undefined}
+                  onDragOver={
+                    r.edit?.collection === "channels"
+                      ? (e) => {
+                          if (!dragging || dragging === r.id || channelBusy)
+                            return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const position =
+                            e.clientY < rect.top + rect.height / 2
+                              ? "before"
+                              : "after";
+                          setDropAt((old) =>
+                            old?.id === r.id && old.position === position
+                              ? old
+                              : { id: r.id, position },
+                          );
+                        }
+                      : undefined
+                  }
+                  onDrop={
+                    r.edit?.collection === "channels"
+                      ? (e) => {
+                          e.preventDefault();
+                          if (dragging && dropAt?.id === r.id && !channelBusy)
+                            reorderChannel(dragging, r.id, dropAt.position);
+                        }
+                      : undefined
+                  }
                   data-channel-color={channel ? "true" : undefined}
                   style={
                     channel
@@ -748,6 +792,44 @@ export function OperatingSheet({
                     style={{ paddingLeft: 14 + r.depth * 16 }}
                   >
                     <div className="row-label">
+                      {r.edit?.collection === "channels" && (
+                        <button
+                          className="channel-drag"
+                          draggable={!channelBusy}
+                          disabled={channelBusy}
+                          aria-label={`${r.label} 채널 순서 이동`}
+                          title="드래그해 채널 이동 · 키보드 ↑↓도 가능"
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", r.id);
+                            setDragging(r.id);
+                          }}
+                          onDragEnd={() => {
+                            setDragging(null);
+                            setDropAt(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (!["ArrowUp", "ArrowDown"].includes(e.key))
+                              return;
+                            e.preventDefault();
+                            const direction = e.key === "ArrowUp" ? -1 : 1;
+                            const target =
+                              sortedChannels[
+                                sortedChannels.findIndex(
+                                  (ch) => ch.id === r.id,
+                                ) + direction
+                              ];
+                            if (target)
+                              reorderChannel(
+                                r.id,
+                                target.id,
+                                direction === -1 ? "before" : "after",
+                              );
+                          }}
+                        >
+                          ⠿
+                        </button>
+                      )}
                       {!row && !r.fixedRollup && !r.id.startsWith("setup:") && (
                         <button
                           className="toggle"

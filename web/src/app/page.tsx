@@ -39,6 +39,7 @@ import {
   loadData,
   saveCells,
   saveMetricOrder,
+  saveChannelOrder,
   saveRecord,
   updateRecord,
 } from "@/lib/repository";
@@ -48,6 +49,8 @@ import { OperatingSheet } from "@/components/operating-sheet";
 import { useServerDate } from "@/components/use-server-date";
 import { resolveSheetCells } from "@/lib/sheet-ad";
 import { moveMetric } from "@/lib/metric-order";
+import { moveChannel } from "@/lib/channel-order";
+import { useNavigation } from "@/components/use-navigation";
 
 const tabs = ["대시보드", "콘텐츠", "이벤트", "분석", "리포트"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
@@ -57,7 +60,7 @@ export default function Home() {
   const clockInitialized = useRef(false);
   const [initializing, setInitializing] = useState(true);
   const [data, setData] = useState<Data>(emptyData);
-  const [nav, setNav] = useState("대시보드");
+  const [nav, setNav] = useNavigation();
   const [month, setMonth] = useState(() => localDate().slice(0, 7));
   const [day, setDay] = useState(localDate);
   const [range, setRange] = useState("month");
@@ -77,6 +80,16 @@ export default function Home() {
   const generation = useRef(0);
   const stateRef = useRef(data);
   const backupInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const closeOverlays = () => {
+      setEditor(null);
+      setDetail(null);
+      setEventDate(null);
+      setSelectedReport(null);
+    };
+    window.addEventListener("popstate", closeOverlays);
+    return () => window.removeEventListener("popstate", closeOverlays);
+  }, []);
   useEffect(() => {
     if (clockSynced && !clockInitialized.current) {
       clockInitialized.current = true;
@@ -607,6 +620,20 @@ export default function Home() {
                   clockSynced={clockSynced}
                   onEdit={edit}
                   onSave={saveGrid}
+                  onChannelMove={(id, target, position) =>
+                    run(async () => {
+                      await saveChannelOrder(
+                        workspace,
+                        moveChannel(
+                          stateRef.current.channels,
+                          id,
+                          target,
+                          position,
+                        ),
+                      );
+                      await refresh(workspace);
+                    })
+                  }
                   onMetricMove={(id, direction) =>
                     run(async () => {
                       await saveMetricOrder(
@@ -1257,6 +1284,17 @@ export default function Home() {
                             await exportBackup(workspace),
                             `로한마케팅_복원직전_${Date.now()}.json`,
                           );
+                          if (Array.isArray(backup.tables.channels)) {
+                            backup.tables.channels = backup.tables.channels.map(
+                              (ch: Record<string, unknown>) => ({
+                                sort_order:
+                                  stateRef.current.channels.find(
+                                    (c) => c.id === ch.id,
+                                  )?.sort_order ?? 2147483647,
+                                ...ch,
+                              }),
+                            );
+                          }
                           if (Array.isArray(backup.tables.mkt_metrics)) {
                             backup.tables.mkt_metrics =
                               backup.tables.mkt_metrics.map(

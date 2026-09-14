@@ -19,6 +19,71 @@ const {
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+const { navigateTab, navigationTab } = require("../src/lib/navigation.ts");
+const { orderedChannels, moveChannel } = require("../src/lib/channel-order.ts");
+test("메뉴 전환은 기록을 추가하고 뒤로·앞으로 이전 메뉴와 배포 경로를 복원한다", () => {
+  const urls = ["https://example.com/chaeum-marketing/"];
+  let cursor = 0,
+    events = 0;
+  const browser = {
+    get location() {
+      return new URL(urls[cursor]);
+    },
+    dispatchEvent() {
+      events++;
+      return true;
+    },
+    history: {
+      state: { __NA: true },
+      pushState(state, _, url) {
+        assert.deepEqual(state, { __NA: true });
+        urls.splice(cursor + 1);
+        urls.push(url);
+        cursor++;
+      },
+    },
+  };
+  navigateTab(browser, "콘텐츠");
+  navigateTab(browser, "콘텐츠");
+  navigateTab(browser, "분석");
+  assert.equal(urls.length, 3);
+  assert.equal(events, 2);
+  cursor--;
+  assert.equal(navigationTab(browser.location.hash), "콘텐츠");
+  cursor--;
+  assert.equal(navigationTab(browser.location.hash), "대시보드");
+  cursor++;
+  assert.equal(navigationTab(browser.location.hash), "콘텐츠");
+  assert.equal(browser.location.pathname, "/chaeum-marketing/");
+  navigateTab(browser, "리포트");
+  assert.equal(urls.length, 3);
+  assert.equal(navigationTab(browser.location.hash), "리포트");
+});
+test("채널 이동은 순서를 재저장하고 새 채널은 뒤에 추가하며 고정 패널은 제외한다", () => {
+  const channels = [
+    { id: "a", sort_order: 0 },
+    { id: "b", sort_order: 1 },
+    { id: "bitly", sort_order: 2147483647 },
+  ];
+  const moved = moveChannel(channels, "bitly", "a", "before");
+  assert.deepEqual(
+    orderedChannels([...moved].reverse()).map((c) => c.id),
+    ["bitly", "a", "b"],
+  );
+  assert.deepEqual(
+    moveChannel(moved, "bitly", "b", "after").map((c) => c.id),
+    ["a", "b", "bitly"],
+  );
+  assert.deepEqual(
+    orderedChannels([...moved, { id: "new" }]).map((c) => c.id),
+    ["bitly", "a", "b", "new"],
+  );
+  assert.deepEqual(moveChannel(channels, "academy", "a", "before"), []);
+  assert.deepEqual(
+    channels.map((c) => c.sort_order),
+    [0, 1, 2147483647],
+  );
+});
 const { withMetricCosts } = require("../src/lib/metric-costs.ts");
 
 test("선택한 비용 지표만 월·연간 비용과 채널 성과에 한 번 합산한다", () => {
