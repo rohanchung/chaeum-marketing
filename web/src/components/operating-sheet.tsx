@@ -11,6 +11,8 @@ import {
   modeLabels,
   number,
   scopeLabels,
+  isBusinessProfile,
+  metricsForContent,
 } from "@/lib/domain";
 import { metricValue } from "@/lib/analytics";
 import { isEventChannel, sheetPromotions } from "@/lib/sheet-ad";
@@ -154,7 +156,8 @@ export function OperatingSheet({
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const isCollapsed = (id: string) =>
-    collapsed[id] ?? data.contents.some((c) => c.id === id);
+    collapsed[id] ??
+    data.contents.some((c) => c.id === id && !isBusinessProfile(c));
   const [includeArchive, setIncludeArchive] = useState(false);
   const [error, setError] = useState("");
   const table = useRef<HTMLDivElement>(null);
@@ -229,12 +232,16 @@ export function OperatingSheet({
         edit: { collection: "channels", record: ch },
         add: { collection: "contents", record: { channel_id: ch.id } },
       });
-      const contents = data.contents.filter(
-        (c) =>
-          c.channel_id === ch.id &&
-          !c.deleted_at &&
-          (includeArchive || c.status !== "archived"),
-      );
+      const contents = data.contents
+        .filter(
+          (c) =>
+            c.channel_id === ch.id &&
+            !c.deleted_at &&
+            (includeArchive || c.status !== "archived"),
+        )
+        .sort(
+          (a, b) => Number(isBusinessProfile(b)) - Number(isBusinessProfile(a)),
+        );
       contents.forEach((c) => {
         rows.push({
           id: c.id,
@@ -243,11 +250,11 @@ export function OperatingSheet({
           parentIds: [ch.id],
           detail: `${c.status === "archived" ? "아카이브 · " : ""}${datePart(c.published_at) || "발행일 미입력"}`,
           edit: { collection: "contents", record: c },
-          add: { collection: "promotions", record: { content_id: c.id } },
+          add: isBusinessProfile(c)
+            ? undefined
+            : { collection: "promotions", record: { content_id: c.id } },
         });
-        const ms = data.metrics.filter(
-          (m) => m.channel_id === ch.id && !m.deleted_at,
-        );
+        const ms = metricsForContent(data.metrics, c);
         metricRows(
           ms.filter((m) => m.scope !== "paid"),
           c.id,
@@ -255,6 +262,7 @@ export function OperatingSheet({
           2,
           [ch.id, c.id],
         );
+        if (isBusinessProfile(c)) return;
         const directAd = ch.measurement_template === "paid_ad";
         const promotions = directAd
           ? sheetPromotions(data, c.id, period)

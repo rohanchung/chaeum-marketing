@@ -27,6 +27,7 @@ import {
   percent,
   scopeLabels,
   timestamp,
+  isBusinessProfile,
 } from "@/lib/domain";
 import { report, sourceName } from "@/lib/analytics";
 import {
@@ -1307,19 +1308,21 @@ export default function Home() {
                 )}
                 <p>{c.notes}</p>
                 {lifecycleActions("contents", c)}
-                <div className="section-toolbar">
-                  <h3>광고 집행 이력</h3>
-                  <button
-                    onClick={() =>
-                      edit({
-                        collection: "promotions",
-                        record: { content_id: c.id },
-                      })
-                    }
-                  >
-                    ＋ 집행 추가
-                  </button>
-                </div>
+                {!isBusinessProfile(c) && (
+                  <div className="section-toolbar">
+                    <h3>광고 집행 이력</h3>
+                    <button
+                      onClick={() =>
+                        edit({
+                          collection: "promotions",
+                          record: { content_id: c.id },
+                        })
+                      }
+                    >
+                      ＋ 집행 추가
+                    </button>
+                  </div>
+                )}
                 {data.promotions
                   .filter((p) => p.content_id === c.id)
                   .map((p) => (

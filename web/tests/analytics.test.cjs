@@ -211,7 +211,7 @@ test("server date crosses Korean midnight without trusting the device date", () 
   assert.throws(() => projectedServerDate("invalid", 0));
 });
 
-test("Carrot template exposes raw metrics, independent reaction details, and computed ratios", () => {
+test("Carrot ad template keeps entered metrics and computed ratios", () => {
   const d = fixture();
   d.metrics = metricTemplate("paid_ad").map((m, i) => ({
     ...base,
@@ -223,9 +223,6 @@ test("Carrot template exposes raw metrics, independent reaction details, and com
     ["impressions", 1000],
     ["clicks", 20],
     ["reactions", 5],
-    ["regulars", 2],
-    ["interests", 2],
-    ["couponDownloads", 1],
   ])
     observation(d, key, value, "2026-09-01", "paid");
   d.costs = [
@@ -247,7 +244,7 @@ test("Carrot template exposes raw metrics, independent reaction details, and com
   assert.equal(d.metrics.filter((m) => m.mode === "ratio").length, 3);
 });
 
-test("Carrot reach preserves the latest observation without summing repeated people", () => {
+test("Business profile metrics stay separate from ads in the sheet and reports", () => {
   const d = fixture();
   d.metrics = metricTemplate("paid_ad").map((m, i) => ({
     ...base,
@@ -255,9 +252,73 @@ test("Carrot reach preserves the latest observation without summing repeated peo
     id: `carrot${i}`,
     channel_id: "ch",
   }));
-  observation(d, "paidReach", 1484, "2026-09-01", "paid");
-  observation(d, "paidReach", 1200, "2026-09-02", "paid");
-  assert.equal(metricValue(d, row(d, "paidReach", "paid"), period).value, 1200);
+  const { metricsForContent } = require("../src/lib/domain.ts");
+  const profile = {
+    ...d.contents[0],
+    id: "profile",
+    title: "비즈프로필",
+    content_type: "business_profile",
+  };
+  d.contents.push(profile);
+  assert.deepEqual(
+    metricsForContent(d.metrics, profile).map((m) => m.name),
+    ["방문수", "단골수", "쿠폰 발급수"],
+  );
+  assert.ok(
+    metricsForContent(d.metrics, d.contents[0]).every(
+      (m) => m.scope === "paid",
+    ),
+  );
+  const regulars = d.metrics.find((m) => m.key === "bizProfileRegulars");
+  const visits = d.metrics.find((m) => m.key === "bizProfileVisits");
+  d.values = [
+    {
+      ...base,
+      id: "reg1",
+      metric_id: regulars.id,
+      content_id: "profile",
+      promotion_id: null,
+      metric_date: "2026-09-01",
+      value: 12,
+    },
+    {
+      ...base,
+      id: "reg2",
+      metric_id: regulars.id,
+      content_id: "profile",
+      promotion_id: null,
+      metric_date: "2026-09-02",
+      value: 10,
+    },
+    {
+      ...base,
+      id: "visit1",
+      metric_id: visits.id,
+      content_id: "profile",
+      promotion_id: null,
+      metric_date: "2026-09-01",
+      value: 8,
+    },
+    {
+      ...base,
+      id: "visit2",
+      metric_id: visits.id,
+      content_id: "profile",
+      promotion_id: null,
+      metric_date: "2026-09-02",
+      value: 9,
+    },
+  ];
+  const r = report(d, period);
+  const pm = r.metrics.filter((m) => m.content === "비즈프로필");
+  assert.equal(pm.find((m) => m.metric === "단골수").value, 10);
+  assert.equal(pm.find((m) => m.metric === "방문수").value, 17);
+  assert.equal(pm.length, 3);
+  assert.ok(
+    r.metrics
+      .filter((m) => m.content !== "비즈프로필")
+      .every((m) => !["방문수", "단골수", "쿠폰 발급수"].includes(m.metric)),
+  );
 });
 
 test("independent metrics, corrected cumulative snapshots use last value, not MAX or sum", () => {

@@ -13,6 +13,7 @@ import {
   inPeriod,
   modeLabels,
   scopeLabels,
+  metricsForContent,
 } from "./domain";
 
 const sum = (values: number[]) => values.reduce((a, b) => a + Number(b), 0);
@@ -348,7 +349,7 @@ export function report(d: Data, p: Period, annual = false): Report {
       d.contents
         .filter((c) => c.channel_id === ch.id && !c.deleted_at)
         .forEach((c) => {
-          d.metrics
+          metricsForContent(d.metrics, c)
             .filter(
               (m) =>
                 m.channel_id === ch.id && m.scope !== "paid" && !m.deleted_at,

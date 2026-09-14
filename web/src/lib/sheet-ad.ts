@@ -6,6 +6,7 @@ import {
   Promotion,
   dates,
   monthPeriod,
+  isBusinessProfile,
 } from "./domain";
 
 export const isEventChannel = (channel: Channel) =>
@@ -63,7 +64,11 @@ export async function resolveSheetCells(
     const channel = data.channels.find(
       (c) => c.id === content?.channel_id && !c.deleted_at,
     );
-    if (!content || channel?.measurement_template !== "paid_ad")
+    if (
+      !content ||
+      isBusinessProfile(content) ||
+      channel?.measurement_template !== "paid_ad"
+    )
       throw new Error("광고 소재를 확인하세요.");
     let promotion = sheetPromotions(
       data,

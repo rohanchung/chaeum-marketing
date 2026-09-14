@@ -356,7 +356,7 @@ export function Editor({
                     <option value="custom">사용자 정의</option>
                     <option value="social_content">인스타그램</option>
                     <option value="blog_content">네이버 블로그</option>
-                    <option value="paid_ad">당근 광고</option>
+                    <option value="paid_ad">당근 마켓</option>
                     <option value="search_ad">검색 광고</option>
                   </select>
                 </Field>
@@ -381,6 +381,9 @@ export function Editor({
                     <option value="reel">릴스</option>
                     <option value="blog">블로그 글</option>
                     <option value="ad_creative">광고 소재</option>
+                    {r.content_type === "business_profile" && (
+                      <option value="business_profile">비즈프로필</option>
+                    )}
                     <option value="other">기타</option>
                   </select>
                 </Field>
@@ -409,6 +412,11 @@ export function Editor({
                     계산
                   </p>
                 </fieldset>
+              ) : r.content_type === "business_profile" ? (
+                <p className="form-note">
+                  방문수·쿠폰 발급수는 하루 수치, 단골수는 해당 날짜의 총 단골
+                  수를 입력하세요. 월간 단골수는 마지막 기록값입니다.
+                </p>
               ) : channelTemplate === "paid_ad" ? (
                 <p className="form-note">
                   저장 후 운영 시트에서 소재 이름을 누르면 노출·클릭·반응·지출을

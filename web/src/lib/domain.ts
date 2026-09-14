@@ -19,6 +19,17 @@ export type Content = Base & {
   content_type: string;
   archived_at: string | null;
 };
+export const isBusinessProfile = (content: Content) =>
+  content.content_type === "business_profile";
+export const metricsForContent = (metrics: Metric[], content: Content) =>
+  metrics.filter(
+    (m) =>
+      !m.deleted_at &&
+      m.channel_id === content.channel_id &&
+      (isBusinessProfile(content)
+        ? m.key.startsWith("bizProfile")
+        : !m.key.startsWith("bizProfile")),
+  );
 export type Promotion = Base & {
   content_id: string;
   title: string;
@@ -317,10 +328,9 @@ export function metricTemplate(template: string): Seed[] {
   ])
     add(k, n, "paid");
   if (template === "paid_ad") {
-    add("paidReach", "도달", "paid", "latest");
-    add("regulars", "단골", "paid");
-    add("interests", "관심", "paid");
-    add("couponDownloads", "쿠폰 다운로드", "paid");
+    add("bizProfileVisits", "방문수", "total");
+    add("bizProfileRegulars", "단골수", "total", "latest");
+    add("bizProfileCoupons", "쿠폰 발급수", "total");
   }
   add("ctr", "클릭률", "paid", "ratio", "percent", "clicks", "impressions");
   add("cpc", "클릭당 비용", "paid", "ratio", "currency", "$spend", "clicks", 1);
