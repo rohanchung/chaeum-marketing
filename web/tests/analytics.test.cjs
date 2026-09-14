@@ -19,6 +19,78 @@ const {
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+test("소재 없는 채널 지표는 일별·월간 보고서에 표시되고 소재에 중복되지 않는다", () => {
+  const d = fixture();
+  const { metricsForContent } = require("../src/lib/domain.ts");
+  const metric = {
+    ...base,
+    id: "site-views",
+    channel_id: "ch",
+    key: "siteViews",
+    name: "페이지뷰",
+    scope: "channel",
+    mode: "daily",
+    unit: "count",
+    sort_order: 0,
+  };
+  d.metrics.push(metric);
+  d.values.push(
+    {
+      ...base,
+      id: "sv1",
+      metric_id: metric.id,
+      content_id: null,
+      promotion_id: null,
+      metric_date: "2026-09-01",
+      value: 20,
+    },
+    {
+      ...base,
+      id: "sv2",
+      metric_id: metric.id,
+      content_id: null,
+      promotion_id: null,
+      metric_date: "2026-09-02",
+      value: 30,
+    },
+  );
+  const channelRow = {
+    id: metric.id,
+    metric,
+    kind: "metric",
+    content_id: null,
+    promotion_id: null,
+  };
+  assert.equal(metricValue(d, channelRow, period).value, 50);
+  assert.equal(
+    metricValue(d, channelRow, { start: "2026-09-02", end: "2026-09-02" })
+      .value,
+    30,
+  );
+  assert.ok(
+    !metricsForContent(d.metrics, d.contents[0]).some(
+      (m) => m.id === metric.id,
+    ),
+  );
+  d.contents = [];
+  d.promotions = [];
+  const values = report(d, period).metrics.filter(
+    (m) => m.metric === "페이지뷰",
+  );
+  assert.equal(values.length, 1);
+  assert.equal(values[0].value, 50);
+  assert.equal(values[0].content, "");
+  assert.equal(
+    rollupValue(
+      d,
+      [channelRow],
+      { channelId: "ch" },
+      `metric:${metric.id}`,
+      period,
+    ),
+    50,
+  );
+});
 const { navigateTab, navigationTab } = require("../src/lib/navigation.ts");
 const { orderedChannels, moveChannel } = require("../src/lib/channel-order.ts");
 test("메뉴 전환은 기록을 추가하고 뒤로·앞으로 이전 메뉴와 배포 경로를 복원한다", () => {

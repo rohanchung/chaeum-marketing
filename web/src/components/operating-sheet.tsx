@@ -356,6 +356,15 @@ export function OperatingSheet({
       edit: { collection: "channels", record: ch },
       add: { collection: "contents", record: { channel_id: ch.id } },
     });
+    metricRows(
+      data.metrics.filter(
+        (m) => m.channel_id === ch.id && m.scope === "channel" && !m.deleted_at,
+      ),
+      null,
+      null,
+      1,
+      [ch.id],
+    );
     const contents = data.contents
       .filter(
         (c) =>
@@ -904,10 +913,18 @@ export function OperatingSheet({
                                 channel_id: ch?.id,
                                 scope: profile
                                   ? "total"
-                                  : ch?.measurement_template === "paid_ad" ||
-                                      ch?.measurement_template === "search_ad"
-                                    ? "paid"
-                                    : "total",
+                                  : !content &&
+                                      ch?.measurement_template === "custom" &&
+                                      !data.contents.some(
+                                        (c) =>
+                                          c.channel_id === ch.id &&
+                                          !c.deleted_at,
+                                      )
+                                    ? "channel"
+                                    : ch?.measurement_template === "paid_ad" ||
+                                        ch?.measurement_template === "search_ad"
+                                      ? "paid"
+                                      : "total",
                                 key_prefix: profile ? "bizProfile" : "",
                                 sort_order:
                                   Math.max(

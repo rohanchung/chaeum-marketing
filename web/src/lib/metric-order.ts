@@ -8,6 +8,7 @@ export function metricGroup(metrics: Metric[], target: Metric) {
       (m) =>
         !m.deleted_at &&
         m.channel_id === target.channel_id &&
+        (m.scope === "channel") === (target.scope === "channel") &&
         (m.scope === "paid") === (target.scope === "paid") &&
         m.key.startsWith("bizProfile") === target.key.startsWith("bizProfile"),
     )

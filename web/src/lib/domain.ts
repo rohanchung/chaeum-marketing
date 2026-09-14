@@ -26,6 +26,7 @@ export const metricsForContent = (metrics: Metric[], content: Content) =>
   metrics.filter(
     (m) =>
       !m.deleted_at &&
+      m.scope !== "channel" &&
       m.channel_id === content.channel_id &&
       (isBusinessProfile(content)
         ? m.key.startsWith("bizProfile")
@@ -53,7 +54,7 @@ export type Metric = Base & {
   channel_id: string | null;
   key: string;
   name: string;
-  scope: "funnel" | "total" | "organic" | "paid";
+  scope: "funnel" | "channel" | "total" | "organic" | "paid";
   unit: "count" | "currency" | "percent";
   mode: "daily" | "cumulative" | "latest" | "ratio";
   numerator: string | null;
@@ -214,6 +215,7 @@ export type Report = {
 };
 export const scopeLabels = {
   funnel: "학원 전체",
+  channel: "채널 전체 · 소재 없이 기록",
   total: "전체 성과 · 광고 포함 가능",
   organic: "자연 유입",
   paid: "광고 성과",

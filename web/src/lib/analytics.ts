@@ -52,7 +52,9 @@ export function metricValue(
       (c) =>
         !c.deleted_at &&
         c.payment_status === "paid" &&
-        c.promotion_id === row.promotion_id &&
+        (row.metric?.scope === "channel"
+          ? sourceChannel(d, c) === row.metric.channel_id
+          : c.promotion_id === row.promotion_id) &&
         c.category === "media" &&
         inPeriod(c.expense_date, p),
     );
@@ -348,6 +350,28 @@ export function report(d: Data, p: Period, annual = false): Report {
           promotion_id: null,
         },
         "학원 전체",
+        "",
+        "",
+      ),
+    );
+  d.metrics
+    .filter(
+      (m) =>
+        m.scope === "channel" &&
+        !m.deleted_at &&
+        d.channels.some((c) => c.id === m.channel_id && !c.deleted_at),
+    )
+    .forEach((m) =>
+      push(
+        {
+          id: m.id,
+          label: m.name,
+          kind: "metric",
+          metric: m,
+          content_id: null,
+          promotion_id: null,
+        },
+        d.channels.find((c) => c.id === m.channel_id)!.name,
         "",
         "",
       ),
