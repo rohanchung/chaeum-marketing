@@ -8,7 +8,11 @@ import {
 } from "./domain";
 import { metricValue, sourceChannel, summary } from "./analytics";
 
-export type RollupTarget = { channelId?: string; contentId?: string };
+export type RollupTarget = {
+  channelId?: string;
+  contentId?: string;
+  academy?: boolean;
+};
 export type RollupOption = { id: string; label: string; unit: string };
 export function rollupOptions(
   rows: MetricRow[],
@@ -23,12 +27,7 @@ export function rollupOptions(
       label: `${scopeLabels[m.scope]} · ${m.name}`,
       unit: m.unit === "percent" ? "%" : m.unit === "currency" ? "원" : "",
     })),
-    ...(finance
-      ? [
-          { id: "spend", label: "마케팅 비용", unit: "원" },
-          { id: "roi", label: "ROI", unit: "%" },
-        ]
-      : []),
+    ...(finance ? [{ id: "spend", label: "마케팅 비용", unit: "원" }] : []),
   ];
 }
 
@@ -39,6 +38,19 @@ export function rollupValue(
   selection: string,
   period: Period,
 ): number | null {
+  if (target.academy) {
+    const s = summary(data, period);
+    const per = (n: number | null) =>
+      n !== null && n > 0 ? s.spend / n : null;
+    const values: Record<string, number | null> = {
+      "academy:spend": s.spend,
+      "academy:consultations": s.consultations,
+      "academy:enrollments": s.enrollments,
+      "academy:consultCost": per(s.consultations),
+      "academy:enrollCost": per(s.enrollments),
+    };
+    return values[selection] ?? null;
+  }
   if (selection === "spend" || selection === "roi") {
     const promoIds = new Set(
       data.promotions

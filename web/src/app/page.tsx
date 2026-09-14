@@ -193,7 +193,18 @@ export default function Home() {
   ) {
     if (!workspace) return;
     await run(async () => {
-      if (
+      if (collection === "values") {
+        await saveCells(workspace, [
+          {
+            kind: "metric",
+            metric_id: String(record.metric_id),
+            content_id: record.content_id as string | null,
+            promotion_id: record.promotion_id as string | null,
+            date: String(record.metric_date),
+            value: record.value as number | null,
+          },
+        ]);
+      } else if (
         collection === "costs" &&
         record.promotion_id &&
         record.category === "media"
@@ -997,7 +1008,25 @@ export default function Home() {
                               ? "계획"
                               : "취소",
                         money(c.amount),
-                        lifecycleActions("costs", c),
+                        c.metric_value_id ? (
+                          <button
+                            key="edit"
+                            onClick={() => {
+                              const v = data.values.find(
+                                (v) => v.id === c.metric_value_id,
+                              );
+                              if (v)
+                                edit({
+                                  collection: "values",
+                                  record: { ...v, title: c.title },
+                                });
+                            }}
+                          >
+                            금액 수정
+                          </button>
+                        ) : (
+                          lifecycleActions("costs", c)
+                        ),
                       ])}
                   />
                 ) : analysisTab === "고객" ? (
@@ -1228,6 +1257,13 @@ export default function Home() {
                             await exportBackup(workspace),
                             `채움_복원직전_${Date.now()}.json`,
                           );
+                          if (Array.isArray(backup.tables.mkt_metrics)) {
+                            backup.tables.mkt_metrics = backup.tables.mkt_metrics.map((m: Record<string, unknown>) => {
+                              const current = stateRef.current.metrics.find(x => x.id === m.id);
+                              return { include_in_marketing: current?.include_in_marketing ?? false,
+                                funnel_role: current?.funnel_role ?? (m.scope === "funnel" ? ["kakao", "phone", "visit"].includes(String(m.key)) ? "consultations" : ["inflows", "enrollments"].includes(String(m.key)) ? m.key : null : null), ...m };
+                            });
+                          }
                           const { error } = await supabase.rpc(
                             "mkt_restore_backup",
                             { p_workspace: workspace, p_backup: backup.tables },
@@ -1484,7 +1520,7 @@ function Kpis({
   const cards = compact
     ? [
         ["학원 유입", number(s.inflows), "전체 일일 집계"],
-        ["상담 건수", number(s.consultations), "카카오 · 전화 · 방문"],
+        ["상담 건수", number(s.consultations), "상담으로 분류한 학원 지표"],
         ["신규 등록", number(s.enrollments), "학원 전체"],
         ["마케팅 비용", money(s.spend), "지급 완료 기준"],
         ["순수납 매출", money(s.revenue), "등록 관련 결제 − 환불"],
@@ -1665,7 +1701,7 @@ function Analysis({ report: r }: { report: Report }) {
             "확인 매출",
             "객단가",
             "확인 등록당 비용",
-            level === "집행" ? "광고 ROAS" : "기간 ROI",
+            ...(level === "집행" ? ["광고 ROAS"] : []),
           ]}
           rows={r.activities
             .filter((a) => a.kind === level)
@@ -1677,7 +1713,7 @@ function Analysis({ report: r }: { report: Report }) {
               money(a.revenue),
               money(a.aov),
               money(a.costPerEnrollment),
-              level === "집행" ? number(a.roas, "배") : percent(a.roi),
+              ...(level === "집행" ? [number(a.roas, "배")] : []),
             ])}
         />
       </section>

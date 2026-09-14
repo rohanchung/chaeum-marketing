@@ -47,6 +47,8 @@ export type MarketingEvent = Base & {
   event_type: string;
 };
 export type Metric = Base & {
+  include_in_marketing?: boolean;
+  funnel_role?: "inflows" | "consultations" | "enrollments" | null;
   channel_id: string | null;
   key: string;
   name: string;
@@ -74,6 +76,7 @@ export type Source = {
 };
 export type Cost = Base &
   Source & {
+    metric_value_id?: string;
     expense_date: string;
     category: string;
     amount: number;

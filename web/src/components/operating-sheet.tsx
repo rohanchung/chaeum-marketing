@@ -31,6 +31,7 @@ type DisplayRow = {
   rollup?: RollupTarget;
   fixedRollup?: string;
   finance?: boolean;
+  fixedUnit?: string;
 };
 export function cellNumber(raw: string, metric: Metric | null): number | null {
   const clean = raw.replaceAll(",", "").trim();
@@ -436,18 +437,41 @@ export function OperatingSheet({
             },
           });
         });
-        rows.push({
-          id: `roi:${c.id}`,
-          label: "ROI",
-          depth: 2,
-          parentIds: [ch.id, c.id],
-          rollup: { contentId: c.id },
-          fixedRollup: "roi",
-          detail:
-            "(연결 순수납 − 수업 원가 − 마케팅 비용) ÷ 마케팅 비용. 연결 매출·원가가 없으면 —",
-        });
       });
     });
+  const academyRows: DisplayRow[] = [
+    { id: "academy", label: "학원 전체 마케팅 성과", depth: 0, parentIds: [] },
+  ];
+  for (const [key, label, unit] of [
+    ["spend", "총 마케팅 비용", "원"],
+    ["consultations", "전체 상담", "건"],
+    ["enrollments", "전체 등록", "건"],
+    ["consultCost", "상담당 비용", "원"],
+    ["enrollCost", "등록당 비용", "원"],
+  ]) {
+    academyRows.push({
+      id: `academy:${key}`,
+      label,
+      depth: 1,
+      parentIds: ["academy"],
+      rollup: { academy: true },
+      fixedRollup: `academy:${key}`,
+      fixedUnit: unit,
+    });
+  }
+  const instagram = data.channels.find(
+    (ch) => ch.measurement_template === "social_content" && !ch.deleted_at,
+  );
+  const lastInstagram = instagram
+    ? rows.findLastIndex(
+        (r) => r.id === instagram.id || r.parentIds.includes(instagram.id),
+      )
+    : -1;
+  rows.splice(
+    lastInstagram < 0 ? rows.length : lastInstagram + 1,
+    0,
+    ...academyRows,
+  );
   const visible = rows.filter((r) => !r.parentIds.some(isCollapsed));
   const editable = visible.filter(
     (r) => r.metricRow && r.metricRow.metric?.mode !== "ratio",
@@ -677,8 +701,9 @@ export function OperatingSheet({
                 (options.some((o) => o.id === selections[r.id])
                   ? selections[r.id]
                   : options[0]?.id);
-              const rollupUnit =
-                r.fixedRollup === "roi"
+              const rollupUnit = r.fixedUnit
+                ? r.fixedUnit
+                : r.fixedRollup === "roi"
                   ? "%"
                   : (options.find((o) => o.id === selected)?.unit ?? "");
               const ri = editable.findIndex((e) => e.id === r.id);
@@ -789,7 +814,7 @@ export function OperatingSheet({
                             });
                           }}
                         >
-                          지표＋
+                          ⊕
                         </button>
                       )}
                       {row?.metric && (

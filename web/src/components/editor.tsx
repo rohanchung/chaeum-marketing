@@ -22,6 +22,7 @@ export const titles: Partial<Record<Collection, string>> = {
   events: "이벤트",
   promotions: "광고 집행",
   metrics: "지표",
+  values: "비용 지표 금액",
   costs: "비용",
   customers: "고객·전환",
   payments: "결제·환불",
@@ -112,6 +113,7 @@ export function Editor({
     String(r.scope ?? (r.channel_id ? "total" : "funnel")),
   );
   const [metricMode, setMetricMode] = useState(String(r.mode ?? "daily"));
+  const [metricUnit, setMetricUnit] = useState(String(r.unit ?? "count"));
   const [metricChannel, setMetricChannel] = useState(
     String(r.channel_id ?? ""),
   );
@@ -245,6 +247,14 @@ export function Editor({
           numerator: metricMode === "ratio" ? nullable("numerator") : null,
           denominator: metricMode === "ratio" ? nullable("denominator") : null,
           multiplier: Number(get("multiplier") || 100),
+          include_in_marketing:
+            metricUnit === "currency" &&
+            (metricScope === "funnel" || metricMode === "daily") &&
+            get("include_in_marketing") === "yes",
+          funnel_role:
+            metricScope === "funnel" && metricUnit === "count"
+              ? nullable("funnel_role")
+              : null,
         };
       }
       if (collection === "costs") {
@@ -261,6 +271,15 @@ export function Editor({
           payment_status: get("payment_status"),
           grid_entry:
             !!sourceFields(source).promotion_id && get("category") === "media",
+        };
+      }
+      if (collection === "values") {
+        patch = {
+          metric_id: r.metric_id,
+          content_id: r.content_id,
+          promotion_id: r.promotion_id,
+          metric_date: r.metric_date,
+          value: get("value") === "" ? null : Number(get("value")),
         };
       }
       if (collection === "customers")
@@ -502,6 +521,18 @@ export function Editor({
               )?.measurement_template === "paid_ad" && <CarrotGuide />}
             </>
           )}
+          {collection === "values" && (
+            <>
+              <p>
+                {String(r.title ?? "비용")} · {String(r.metric_date)}
+              </p>
+              <Field label="금액">{input("value", "number")}</Field>
+              <p className="form-note">
+                원본 시트 값과 마케팅 비용에 함께 반영됩니다. 비워서 저장하면
+                해당 날짜 비용을 지웁니다.
+              </p>
+            </>
+          )}
           {collection === "metrics" && (
             <>
               <Field label="지표 이름">{input("name", "text", true)}</Field>
@@ -533,13 +564,55 @@ export function Editor({
                   </select>
                 </Field>
                 <Field label="단위">
-                  <select name="unit" defaultValue={text("unit", "count")}>
+                  <select
+                    name="unit"
+                    value={metricUnit}
+                    onChange={(e) => setMetricUnit(e.target.value)}
+                  >
                     <option value="count">건 / 명 / 회</option>
                     <option value="currency">원</option>
                     <option value="percent">%</option>
                   </select>
                 </Field>
               </div>
+              {metricScope === "funnel" && metricUnit === "count" && (
+                <Field label="학원 성과 집계">
+                  <select
+                    name="funnel_role"
+                    defaultValue={text(
+                      "funnel_role",
+                      ["kakao", "phone", "visit"].includes(String(r.key))
+                        ? "consultations"
+                        : ["inflows", "enrollments"].includes(String(r.key))
+                          ? String(r.key)
+                          : "",
+                    )}
+                  >
+                    <option value="">별도 기록만</option>
+                    <option value="inflows">유입에 합산</option>
+                    <option value="consultations">상담에 합산</option>
+                    <option value="enrollments">등록에 합산</option>
+                  </select>
+                </Field>
+              )}
+              {metricUnit === "currency" &&
+                (metricMode === "daily" || metricScope === "funnel") && (
+                  <Field label="마케팅 비용에 합산할까요?">
+                    <select
+                      name="include_in_marketing"
+                      required
+                      defaultValue={
+                        r.id ? (r.include_in_marketing ? "yes" : "no") : ""
+                      }
+                    >
+                      <option value="" disabled>
+                        선택하세요
+                      </option>
+                      <option value="yes">예 · 실제 지출로 합산</option>
+                      <option value="no">아니요 · 지표로만 기록</option>
+                    </select>
+                  </Field>
+                )}
               <Field label="표시 순서">
                 {input("sort_order", "number", true, "0")}
               </Field>
@@ -746,7 +819,7 @@ export function Editor({
               </Field>
             </>
           )}
-          {collection !== "metrics" && notes}
+          {collection !== "metrics" && collection !== "values" && notes}
           {error && (
             <p role="alert" className="error-box">
               {error}

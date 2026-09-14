@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { CellChange, Data, Metric, metricTemplate } from "./domain";
+import { withMetricCosts } from "./metric-costs";
 export const tables = {
   channels: "channels",
   contents: "contents",
@@ -35,7 +36,7 @@ export async function loadData(workspace: string): Promise<Data> {
       await fetchRows(table, workspace),
     ]),
   );
-  return Object.fromEntries(entries) as Data;
+  return withMetricCosts(Object.fromEntries(entries) as Data);
 }
 export async function saveRecord(
   workspace: string,
@@ -91,6 +92,8 @@ export async function saveMetricOrder(workspace: string, metrics: Metric[]) {
       multiplier: m.multiplier,
       sort_order: m.sort_order,
       deleted_at: m.deleted_at,
+      include_in_marketing: m.include_in_marketing ?? false,
+      funnel_role: m.funnel_role ?? null,
     })),
   );
   if (error) throw new Error(error.message);

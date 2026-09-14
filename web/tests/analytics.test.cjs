@@ -19,6 +19,108 @@ const {
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+const { withMetricCosts } = require("../src/lib/metric-costs.ts");
+
+test("선택한 비용 지표만 월·연간 비용과 채널 성과에 한 번 합산한다", () => {
+  const d = fixture();
+  d.metrics.push({
+    ...base,
+    id: "custom-cost",
+    channel_id: "ch",
+    key: "custom-cost",
+    name: "비용",
+    scope: "total",
+    mode: "daily",
+    unit: "currency",
+    include_in_marketing: true,
+    sort_order: 0,
+  });
+  d.values.push({
+    ...base,
+    id: "cost-value",
+    metric_id: "custom-cost",
+    content_id: "content",
+    promotion_id: null,
+    metric_date: "2026-09-10",
+    value: 30000,
+  });
+  const loaded = withMetricCosts(withMetricCosts(d));
+  assert.equal(loaded.costs.length, 1);
+  assert.equal(summary(loaded, period).spend, 30000);
+  assert.equal(
+    report(loaded, period).activities.find((a) => a.id === "ch").spend,
+    30000,
+  );
+  assert.equal(
+    report(loaded, { start: "2026-01-01", end: "2026-12-31" }, true).summary
+      .spend,
+    30000,
+  );
+  loaded.values[0].value = 20000;
+  assert.equal(summary(withMetricCosts(loaded), period).spend, 20000);
+  loaded.metrics.find((m) => m.id === "custom-cost").include_in_marketing =
+    false;
+  assert.equal(summary(withMetricCosts(loaded), period).spend, 0);
+});
+
+test("추가한 학원 상담·신청·등록 지표도 지정한 분류와 전체 비용 효율에 반영된다", () => {
+  const d = fixture();
+  for (const [key, role, value] of [
+    ["custom-consult", "consultations", 1],
+    ["seminar", "inflows", 6],
+    ["custom-enroll", "enrollments", 2],
+  ]) {
+    d.metrics.push({
+      ...base,
+      id: key,
+      key,
+      name: key,
+      scope: "funnel",
+      channel_id: null,
+      mode: "daily",
+      unit: "count",
+      funnel_role: role,
+    });
+    d.values.push({
+      ...base,
+      id: `v:${key}`,
+      metric_id: key,
+      content_id: null,
+      promotion_id: null,
+      metric_date: "2026-09-10",
+      value,
+    });
+  }
+  d.costs.push({
+    ...base,
+    ...source,
+    id: "expense",
+    amount: 30000,
+    expense_date: "2026-09-10",
+    category: "other",
+    payment_status: "paid",
+  });
+  const s = summary(d, period);
+  assert.equal(s.consultations, 1);
+  assert.equal(s.inflows, 6);
+  assert.equal(s.enrollments, 2);
+  assert.equal(
+    rollupValue(d, [], { academy: true }, "academy:consultCost", period),
+    30000,
+  );
+  assert.equal(
+    rollupValue(d, [], { academy: true }, "academy:enrollCost", period),
+    15000,
+  );
+  assert.equal(
+    rollupValue(d, [], { academy: true }, "academy:enrollCost", {
+      start: "2026-09-11",
+      end: "2026-09-11",
+    }),
+    null,
+  );
+  assert.ok(rollupOptions([]).every((o) => o.id !== "roi"));
+});
 const { moveMetric, metricGroup } = require("../src/lib/metric-order.ts");
 
 test("지표 이동은 중복 순번도 정리하고 다른 채널·프로필·광고 지표를 섞지 않는다", () => {

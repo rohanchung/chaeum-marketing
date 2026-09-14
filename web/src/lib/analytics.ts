@@ -135,11 +135,19 @@ export function summary(
     payments.filter((t) => t.amount > 0).map((t) => t.customer_id),
   ).size;
   const funnel = (key: string) => {
-    const m = d.metrics.find(
-      (m) => m.scope === "funnel" && m.key === key && !m.deleted_at,
+    const items = d.metrics.filter(
+      (m) =>
+        m.scope === "funnel" &&
+        !m.deleted_at &&
+        (m.funnel_role === undefined
+          ? ["kakao", "phone", "visit"].includes(m.key)
+            ? "consultations"
+            : m.key
+          : m.funnel_role) === key,
     );
-    return m
-      ? metricValue(
+    const values = items.map(
+      (m) =>
+        metricValue(
           d,
           {
             id: m.id,
@@ -150,10 +158,13 @@ export function summary(
             promotion_id: null,
           },
           p,
-        ).value
-      : null;
+        ).value,
+    );
+    return values.every((v) => v === null)
+      ? null
+      : sum(values.map((v) => v ?? 0));
   };
-  const consults = ["kakao", "phone", "visit"].map(funnel);
+  const consultations = funnel("consultations");
   const cohort = cs.filter((c) => !c.deleted_at && inPeriod(c.consulted_on, p));
   const cohortEnrolled = cohort.filter(
     (c) => c.enrolled_on && c.enrolled_on <= p.end,
@@ -179,9 +190,7 @@ export function summary(
         : null,
     revenueToSpend: ratio(revenue, spend),
     inflows: funnel("inflows"),
-    consultations: consults.every((v) => v === null)
-      ? null
-      : sum(consults.map((v) => v ?? 0)),
+    consultations,
     enrollments,
     cac: ratio(spend, enrollments),
     cohort: cohort.length,
