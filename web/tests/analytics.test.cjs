@@ -19,6 +19,111 @@ const {
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+const {
+  sheetPromotions,
+  resolveSheetCells,
+  isEventChannel,
+} = require("../src/lib/sheet-ad.ts");
+
+test("당근은 집행 없는 달에도 매일 입력 가능하며 기존 기간을 보존한다", () => {
+  const d = fixture();
+  d.promotions[0].start_date = "2026-09-10";
+  d.promotions[0].end_date = "2026-09-15";
+  const periods = sheetPromotions(d, "content", period);
+  assert.deepEqual(
+    periods.map((p) => [p.start_date, p.end_date]),
+    [
+      ["2026-09-01", "2026-09-09"],
+      ["2026-09-10", "2026-09-15"],
+      ["2026-09-16", "2026-09-30"],
+    ],
+  );
+  assert.equal(d.promotions.length, 1);
+  assert.equal(periods[1].id, "promo");
+});
+
+test("당근 첫 입력·연속 입력은 같은 저장 대상을 사용하고 비용·CTR 계산에 연결된다", async () => {
+  const d = fixture();
+  d.channels[0].measurement_template = "paid_ad";
+  d.promotions = [];
+  d.metrics = metricTemplate("paid_ad").map((m, i) => ({
+    ...base,
+    ...m,
+    id: `ad${i}`,
+    channel_id: "ch",
+  }));
+  const slot = sheetPromotions(d, "content", period)[0].id;
+  let created = 0;
+  const create = async (r) => {
+    created++;
+    return { ...base, ...r, id: "new-promo" };
+  };
+  const cell = (key, value) => ({
+    kind: key === "cost" ? "cost" : "metric",
+    metric_id: d.metrics.find((m) => m.key === key)?.id,
+    content_id: "content",
+    promotion_id: slot,
+    date: "2026-09-14",
+    value,
+  });
+  const result = await resolveSheetCells(
+    d,
+    [cell("impressions", 1000), cell("clicks", 20), cell("cost", 10000)],
+    create,
+  );
+  await resolveSheetCells(d, [cell("reactions", 5)], create);
+  assert.equal(created, 1);
+  assert.ok(result.every((c) => c.promotion_id === "new-promo"));
+  d.values = result
+    .filter((c) => c.kind === "metric")
+    .map((c, i) => ({ ...base, ...c, id: `v${i}`, metric_date: c.date }));
+  d.costs = [
+    {
+      ...base,
+      ...source,
+      id: "cost",
+      promotion_id: "new-promo",
+      expense_date: "2026-09-14",
+      amount: 10000,
+      category: "media",
+      payment_status: "paid",
+      grid_entry: true,
+    },
+  ];
+  const metric = (key) =>
+    metricValue(
+      d,
+      { ...row(d, key, "paid"), promotion_id: "new-promo" },
+      period,
+    ).value;
+  assert.equal(metric("ctr"), 2);
+  assert.equal(metric("cpc"), 500);
+});
+
+test("빈 광고 셀 삭제는 기록을 만들지 않고 일회성 채널만 시트에서 제외한다", async () => {
+  const d = fixture();
+  d.channels[0].measurement_template = "paid_ad";
+  d.promotions = [];
+  const cells = await resolveSheetCells(
+    d,
+    [
+      {
+        kind: "cost",
+        content_id: "content",
+        promotion_id: "sheet:empty",
+        date: "2026-09-14",
+        value: null,
+      },
+    ],
+    async () => {
+      throw new Error("should not create");
+    },
+  );
+  assert.deepEqual(cells, []);
+  assert.equal(isEventChannel({ name: "설명회 · 오프라인" }), true);
+  assert.equal(isEventChannel({ name: "당근 광고" }), false);
+  assert.equal(isEventChannel({ name: "인스타그램" }), false);
+});
 const base = { workspace_id: "ws", deleted_at: null };
 const source = {
   channel_id: null,

@@ -13,6 +13,7 @@ import {
   CellChange,
   Data,
   Report,
+  Promotion,
   Source,
   categories,
   datePart,
@@ -43,6 +44,7 @@ import { downloadExcelReport, openPrintableReport } from "@/lib/report-export";
 import { Editor, EditorState } from "@/components/editor";
 import { OperatingSheet } from "@/components/operating-sheet";
 import { useServerDate } from "@/components/use-server-date";
+import { resolveSheetCells } from "@/lib/sheet-ad";
 
 const tabs = ["대시보드", "콘텐츠", "이벤트", "분석", "리포트"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
@@ -58,6 +60,7 @@ export default function Home() {
   const [range, setRange] = useState("month");
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
+  const [eventDate, setEventDate] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(0);
@@ -224,6 +227,22 @@ export default function Home() {
     const job = queue.current
       .catch(() => {})
       .then(async () => {
+        changes = await resolveSheetCells(
+          { ...stateRef.current, promotions: [...stateRef.current.promotions] },
+          changes,
+          async (record) => {
+            const promotion = (await saveRecord(
+              workspace,
+              "promotions",
+              record,
+            )) as Promotion;
+            stateRef.current = {
+              ...stateRef.current,
+              promotions: [...stateRef.current.promotions, promotion],
+            };
+            return promotion;
+          },
+        );
         const before = changes.map((c) => {
           if (c.kind === "cost") {
             const old = stateRef.current.costs.find(
@@ -575,10 +594,14 @@ export default function Home() {
                   onEdit={edit}
                   onSave={saveGrid}
                   onDate={(date) =>
-                    edit({
-                      collection: "events",
-                      record: { starts_at: timestamp(date) },
-                    })
+                    data.events.some(
+                      (e) => !e.deleted_at && datePart(e.starts_at) === date,
+                    )
+                      ? setEventDate(date)
+                      : edit({
+                          collection: "events",
+                          record: { starts_at: timestamp(date) },
+                        })
                   }
                   onDetail={setDetail}
                   actions={
@@ -1202,6 +1225,53 @@ export default function Home() {
           </>
         )}
       </div>
+      {eventDate && (
+        <div className="modal-backdrop">
+          <section
+            className="panel event-day"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="event-day-title"
+          >
+            <header className="panel-heading">
+              <h2 id="event-day-title">{eventDate} 이벤트</h2>
+              <button
+                aria-label="이벤트 닫기"
+                onClick={() => setEventDate(null)}
+              >
+                ✕
+              </button>
+            </header>
+            {data.events
+              .filter(
+                (e) => !e.deleted_at && datePart(e.starts_at) === eventDate,
+              )
+              .map((e) => (
+                <div key={e.id} className="event-day-item">
+                  <span>
+                    {e.title}
+                    {e.location ? ` · ${e.location}` : ""}
+                  </span>
+                  {lifecycleActions("events", e)}
+                </div>
+              ))}
+            {!data.events.some(
+              (e) => !e.deleted_at && datePart(e.starts_at) === eventDate,
+            ) && <p>기록된 이벤트가 없습니다.</p>}
+            <button
+              className="primary"
+              onClick={() =>
+                edit({
+                  collection: "events",
+                  record: { starts_at: timestamp(eventDate) },
+                })
+              }
+            >
+              ＋ 이벤트 기록
+            </button>
+          </section>
+        </div>
+      )}
       {detail &&
         (() => {
           const c = data.contents.find((c) => c.id === detail);

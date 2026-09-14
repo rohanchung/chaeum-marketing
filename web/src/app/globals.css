@@ -879,6 +879,35 @@ a:hover {
   color: #7d8b71;
   margin-top: 10px;
 }
+.timeline-events th,
+.timeline-events td {
+  height: 28px;
+}
+.event-marker {
+  display: block;
+  max-width: 60px;
+  padding: 2px 3px;
+  margin: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #287a56;
+  background: #e6f3ec;
+  font-size: 10px;
+}
+.event-day {
+  width: min(480px, 95vw);
+  max-height: 80vh;
+  overflow: auto;
+}
+.event-day-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e9e6;
+}
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1422,7 +1451,9 @@ textarea {
   align-items: center;
   gap: 6px;
 }
-.operating-sheet .content-row .row-name small { display: none; }
+.operating-sheet .content-row .row-name small {
+  display: none;
+}
 .operating-sheet .row-name b {
   font-size: 12px;
 }

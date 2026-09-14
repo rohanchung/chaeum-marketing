@@ -13,6 +13,7 @@ import {
   scopeLabels,
 } from "@/lib/domain";
 import { metricValue } from "@/lib/analytics";
+import { isEventChannel, sheetPromotions } from "@/lib/sheet-ad";
 import { EditorState } from "./editor";
 type DisplayRow = {
   id: string;
@@ -152,6 +153,8 @@ export function OperatingSheet({
   actions?: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const isCollapsed = (id: string) =>
+    collapsed[id] ?? data.contents.some((c) => c.id === id);
   const [includeArchive, setIncludeArchive] = useState(false);
   const [error, setError] = useState("");
   const table = useRef<HTMLDivElement>(null);
@@ -181,7 +184,7 @@ export function OperatingSheet({
       .sort((a, b) => a.sort_order - b.sort_order)
       .forEach((m) =>
         rows.push({
-          id: `${m.id}:${content}:${promotion}`,
+          id: `${m.id}:${content}:${promotion && parents.includes(promotion) ? promotion : "direct"}`,
           label: m.name,
           depth,
           parentIds: parents,
@@ -215,7 +218,7 @@ export function OperatingSheet({
     ["funnel"],
   );
   data.channels
-    .filter((ch) => !ch.deleted_at)
+    .filter((ch) => !ch.deleted_at && !isEventChannel(ch))
     .forEach((ch) => {
       rows.push({
         id: ch.id,
@@ -252,13 +255,16 @@ export function OperatingSheet({
           2,
           [ch.id, c.id],
         );
-        const promotions = data.promotions.filter(
-          (p) =>
-            p.content_id === c.id &&
-            !p.deleted_at &&
-            p.start_date <= period.end &&
-            p.end_date >= period.start,
-        );
+        const directAd = ch.measurement_template === "paid_ad";
+        const promotions = directAd
+          ? sheetPromotions(data, c.id, period)
+          : data.promotions.filter(
+              (p) =>
+                p.content_id === c.id &&
+                !p.deleted_at &&
+                p.start_date <= period.end &&
+                p.end_date >= period.start,
+            );
         if (ms.some((m) => m.scope === "paid") && promotions.length === 0) {
           const hasPrevious = data.promotions.some(
             (p) => p.content_id === c.id && !p.deleted_at,
@@ -278,28 +284,36 @@ export function OperatingSheet({
           });
         }
         promotions.forEach((p) => {
-          rows.push({
-            id: p.id,
-            label: p.title,
-            depth: 2,
-            parentIds: [ch.id, c.id],
-            detail: `광고 · ${p.start_date} ~ ${p.end_date}`,
-            edit: { collection: "promotions", record: p },
-          });
+          if (!directAd || promotions.length > 1)
+            rows.push({
+              id: p.id,
+              label: p.title,
+              depth: 2,
+              parentIds: [ch.id, c.id],
+              detail: `광고 · ${p.start_date} ~ ${p.end_date}`,
+              edit: p.id.startsWith("sheet:")
+                ? undefined
+                : { collection: "promotions", record: p },
+            });
           metricRows(
             ms.filter((m) => m.scope === "paid"),
             c.id,
             p.id,
-            3,
-            [ch.id, c.id, p.id],
+            directAd && promotions.length === 1 ? 2 : 3,
+            directAd && promotions.length === 1
+              ? [ch.id, c.id]
+              : [ch.id, c.id, p.id],
             p.start_date,
             p.end_date,
           );
           rows.push({
-            id: `cost:${p.id}`,
+            id: `cost:${directAd && promotions.length === 1 ? c.id : p.id}`,
             label: ch.measurement_template === "paid_ad" ? "지출" : "광고비",
-            depth: 3,
-            parentIds: [ch.id, c.id, p.id],
+            depth: directAd && promotions.length === 1 ? 2 : 3,
+            parentIds:
+              directAd && promotions.length === 1
+                ? [ch.id, c.id]
+                : [ch.id, c.id, p.id],
             detail: "비용 원장 · 지급액",
             metricRow: {
               id: p.id,
@@ -315,7 +329,7 @@ export function OperatingSheet({
         });
       });
     });
-  const visible = rows.filter((r) => !r.parentIds.some((id) => collapsed[id]));
+  const visible = rows.filter((r) => !r.parentIds.some(isCollapsed));
   const editable = visible.filter(
     (r) => r.metricRow && r.metricRow.metric?.mode !== "ratio",
   );
@@ -450,6 +464,40 @@ export function OperatingSheet({
             </tr>
           </thead>
           <tbody>
+            <tr className="timeline-events">
+              <th className="label-col">이벤트 · 날짜를 눌러 기록</th>
+              <td className="summary-col">
+                {
+                  data.events.filter(
+                    (e) =>
+                      !e.deleted_at &&
+                      datePart(e.starts_at) >= period.start &&
+                      datePart(e.starts_at) <= period.end,
+                  ).length
+                }
+                건
+              </td>
+              {ds.map((date) => (
+                <td key={date} className={date === today ? "today-col" : ""}>
+                  {data.events
+                    .filter(
+                      (e) => !e.deleted_at && datePart(e.starts_at) === date,
+                    )
+                    .map((e) => (
+                      <button
+                        key={e.id}
+                        className="event-marker"
+                        title={e.title}
+                        onClick={() =>
+                          onEdit({ collection: "events", record: e })
+                        }
+                      >
+                        {e.title}
+                      </button>
+                    ))}
+                </td>
+              ))}
+            </tr>
             {visible.map((r) => {
               const row = r.metricRow;
               const ri = editable.findIndex((e) => e.id === r.id);
@@ -473,20 +521,31 @@ export function OperatingSheet({
                       {!row && !r.id.startsWith("setup:") && (
                         <button
                           className="toggle"
-                          aria-label={`${r.label} ${collapsed[r.id] ? "펼치기" : "접기"}`}
+                          aria-label={`${r.label} ${isCollapsed(r.id) ? "펼치기" : "접기"}`}
                           onClick={() =>
-                            setCollapsed((x) => ({ ...x, [r.id]: !x[r.id] }))
+                            setCollapsed((x) => ({
+                              ...x,
+                              [r.id]: !isCollapsed(r.id),
+                            }))
                           }
                         >
-                          {collapsed[r.id] ? "›" : "⌄"}
+                          {isCollapsed(r.id) ? "›" : "⌄"}
                         </button>
                       )}
                       <button
                         className="row-name"
+                        aria-expanded={
+                          r.edit?.collection === "contents"
+                            ? !isCollapsed(r.id)
+                            : undefined
+                        }
                         title={`${r.label}${r.detail ? ` · ${r.detail}` : ""}`}
                         onClick={() =>
                           r.edit?.collection === "contents"
-                            ? onDetail(r.id)
+                            ? setCollapsed((x) => ({
+                                ...x,
+                                [r.id]: !isCollapsed(r.id),
+                              }))
                             : r.edit && onEdit(r.edit)
                         }
                         disabled={!r.edit}
@@ -494,6 +553,15 @@ export function OperatingSheet({
                         <b>{r.label}</b>
                         <small>{r.detail}</small>
                       </button>
+                      {r.edit?.collection === "contents" && (
+                        <button
+                          className="row-add"
+                          aria-label={`${r.label} 상세·수정`}
+                          onClick={() => onDetail(r.id)}
+                        >
+                          ⋯
+                        </button>
+                      )}
                       {r.add && (
                         <button
                           className="row-add"

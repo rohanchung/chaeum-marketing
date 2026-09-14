@@ -120,9 +120,7 @@ export function Editor({
     (c) => c.id === metricChannel,
   )?.measurement_template;
   const createWithAd =
-    collection === "contents" &&
-    !r.id &&
-    ["paid_ad", "search_ad"].includes(channelTemplate ?? "");
+    collection === "contents" && !r.id && channelTemplate === "search_ad";
   const [paymentCustomer, setPaymentCustomer] = useState(
     String(r.customer_id ?? ""),
   );
@@ -411,6 +409,12 @@ export function Editor({
                     계산
                   </p>
                 </fieldset>
+              ) : channelTemplate === "paid_ad" ? (
+                <p className="form-note">
+                  저장 후 운영 시트에서 소재 이름을 누르면 노출·클릭·반응·지출을
+                  날짜별로 입력할 수 있습니다. 클릭률과 클릭당 비용은 자동
+                  계산됩니다.
+                </p>
               ) : (
                 <p className="form-note">
                   광고 집행은 소재 상세 또는 시트의 ‘광고 지표 입력’에서
