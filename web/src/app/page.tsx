@@ -38,6 +38,7 @@ import {
   exportBackup,
   loadData,
   saveCells,
+  saveMetricOrder,
   saveRecord,
   updateRecord,
 } from "@/lib/repository";
@@ -46,6 +47,7 @@ import { Editor, EditorState } from "@/components/editor";
 import { OperatingSheet } from "@/components/operating-sheet";
 import { useServerDate } from "@/components/use-server-date";
 import { resolveSheetCells } from "@/lib/sheet-ad";
+import { moveMetric } from "@/lib/metric-order";
 
 const tabs = ["대시보드", "콘텐츠", "이벤트", "분석", "리포트"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
@@ -594,6 +596,23 @@ export default function Home() {
                   clockSynced={clockSynced}
                   onEdit={edit}
                   onSave={saveGrid}
+                  onMetricMove={(id, direction) =>
+                    run(async () => {
+                      await saveMetricOrder(
+                        workspace,
+                        moveMetric(stateRef.current.metrics, id, direction),
+                      );
+                      await refresh(workspace);
+                    })
+                  }
+                  onMetricDelete={(id, deleted) =>
+                    run(async () => {
+                      await updateRecord(workspace, "metrics", id, {
+                        deleted_at: deleted ? new Date().toISOString() : null,
+                      });
+                      await refresh(workspace);
+                    })
+                  }
                   onDate={(date) =>
                     data.events.some(
                       (e) => !e.deleted_at && datePart(e.starts_at) === date,

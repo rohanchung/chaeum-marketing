@@ -1,5 +1,5 @@
 "use client";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
 import {
   CellChange,
   Data,
@@ -18,6 +18,7 @@ import { metricValue } from "@/lib/analytics";
 import { RollupTarget, rollupOptions, rollupValue } from "@/lib/sheet-rollup";
 import { isEventChannel, sheetPromotions } from "@/lib/sheet-ad";
 import { EditorState } from "./editor";
+import { compareMetrics, metricGroup } from "@/lib/metric-order";
 type DisplayRow = {
   id: string;
   label: string;
@@ -142,6 +143,8 @@ export function OperatingSheet({
   period,
   onEdit,
   onSave,
+  onMetricMove,
+  onMetricDelete,
   onDate,
   onDetail,
   today,
@@ -152,6 +155,8 @@ export function OperatingSheet({
   period: Period;
   onEdit: (state: EditorState) => void;
   onSave: (cells: CellChange[]) => Promise<void>;
+  onMetricMove: (id: string, direction: -1 | 1) => Promise<void>;
+  onMetricDelete: (id: string, deleted: boolean) => Promise<void>;
   onDate: (date: string) => void;
   onDetail: (id: string) => void;
   today: string;
@@ -159,11 +164,91 @@ export function OperatingSheet({
   actions?: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [metricBusy, setMetricBusy] = useState(false);
+  const widthKey = "marketing-sheet-widths";
+  type Column = "label" | "summary";
+  const clampWidth = (col: Column, width: number) =>
+    Math.max(
+      col === "label" ? 180 : 100,
+      Math.min(col === "label" ? 720 : 480, width),
+    );
+  const [widths, setWidths] = useState<Partial<Record<Column, number>>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(widthKey) || "{}");
+      return Object.fromEntries(
+        (["label", "summary"] as const)
+          .filter((k) => Number.isFinite(saved?.[k]))
+          .map((k) => [k, clampWidth(k, saved[k])]),
+      );
+    } catch {
+      return {};
+    }
+  });
+  const drag = useRef<{
+    column: Column;
+    x: number;
+    width: number;
+    current: number;
+  } | null>(null);
+  const storeWidth = (column: Column, width: number) => {
+    const next = { ...widths, [column]: clampWidth(column, width) };
+    setWidths(next);
+    try {
+      localStorage.setItem(widthKey, JSON.stringify(next));
+    } catch {}
+  };
+  const resizeHandle = (column: Column) => (
+    <span
+      className="column-resize"
+      role="separator"
+      aria-orientation="vertical"
+      tabIndex={0}
+      aria-label={`${column === "label" ? "운영 대상" : "월간 요약"} 열 너비 조절`}
+      title="좌우로 드래그해 열 너비 조절"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const width = e.currentTarget.parentElement!.offsetWidth;
+        drag.current = { column, x: e.clientX, width, current: width };
+      }}
+      onPointerMove={(e) => {
+        if (!drag.current || drag.current.column !== column) return;
+        drag.current.current = clampWidth(
+          column,
+          drag.current.width + e.clientX - drag.current.x,
+        );
+        table.current
+          ?.closest<HTMLElement>(".sheet-card")
+          ?.style.setProperty(`--${column}-width`, `${drag.current.current}px`);
+      }}
+      onPointerUp={(e) => {
+        if (drag.current) storeWidth(column, drag.current.current);
+        drag.current = null;
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }}
+      onPointerCancel={() => {
+        if (drag.current) storeWidth(column, drag.current.current);
+        drag.current = null;
+      }}
+      onKeyDown={(e) => {
+        if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
+          e.preventDefault();
+          storeWidth(
+            column,
+            e.currentTarget.parentElement!.offsetWidth +
+              (e.key === "ArrowRight" ? 10 : -10),
+          );
+        }
+      }}
+    />
+  );
   const selectionKey = `sheet-rollups:${data.channels[0]?.workspace_id ?? ""}`;
   const [selections, setSelections] = useState<Record<string, string>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(selectionKey) || "{}");
-      return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+      return saved && typeof saved === "object" && !Array.isArray(saved)
+        ? saved
+        : {};
     } catch {
       return {};
     }
@@ -196,28 +281,26 @@ export function OperatingSheet({
     start?: string,
     end?: string,
   ) =>
-    metrics
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .forEach((m) =>
-        rows.push({
-          id: `${m.id}:${content}:${promotion && parents.includes(promotion) ? promotion : "direct"}`,
+    metrics.sort(compareMetrics).forEach((m) =>
+      rows.push({
+        id: `${m.id}:${content}:${promotion && parents.includes(promotion) ? promotion : "direct"}`,
+        label: m.name,
+        depth,
+        parentIds: parents,
+        detail: `${scopeLabels[m.scope]} · ${modeLabels[m.mode]}`,
+        edit: { collection: "metrics", record: m },
+        metricRow: {
+          id: m.id,
           label: m.name,
-          depth,
-          parentIds: parents,
-          detail: `${scopeLabels[m.scope]} · ${modeLabels[m.mode]}`,
-          edit: { collection: "metrics", record: m },
-          metricRow: {
-            id: m.id,
-            label: m.name,
-            kind: "metric",
-            metric: m,
-            content_id: content,
-            promotion_id: promotion,
-            start,
-            end,
-          },
-        }),
-      );
+          kind: "metric",
+          metric: m,
+          content_id: content,
+          promotion_id: promotion,
+          start,
+          end,
+        },
+      }),
+    );
   rows.push({
     id: "funnel",
     label: "학원 전체 퍼널",
@@ -426,7 +509,15 @@ export function OperatingSheet({
     target?.focus();
   };
   return (
-    <section className="sheet-card">
+    <section
+      className="sheet-card"
+      style={
+        {
+          "--label-width": widths.label ? `${widths.label}px` : undefined,
+          "--summary-width": widths.summary ? `${widths.summary}px` : undefined,
+        } as CSSProperties
+      }
+    >
       <div className="sheet-tools">
         <span>
           운영 시트{" "}
@@ -454,6 +545,32 @@ export function OperatingSheet({
           <button onClick={() => onEdit({ collection: "channels" })}>
             ＋ 채널
           </button>
+          <details className="quick-menu">
+            <summary>삭제한 지표</summary>
+            <div>
+              {data.metrics
+                .filter((m) => m.deleted_at)
+                .map((m) => (
+                  <button
+                    key={m.id}
+                    disabled={metricBusy}
+                    onClick={() => {
+                      setMetricBusy(true);
+                      void onMetricDelete(m.id, false)
+                        .catch(() => {})
+                        .finally(() => setMetricBusy(false));
+                    }}
+                  >
+                    {data.channels.find((c) => c.id === m.channel_id)?.name ??
+                      "학원 전체"}{" "}
+                    · {m.name} 복원
+                  </button>
+                ))}
+              {!data.metrics.some((m) => m.deleted_at) && (
+                <span>삭제한 지표가 없습니다.</span>
+              )}
+            </div>
+          </details>
         </div>
       </div>
       {error && (
@@ -465,8 +582,12 @@ export function OperatingSheet({
         <table className="operating-sheet">
           <thead>
             <tr>
-              <th className="label-col">운영 대상 / 지표</th>
-              <th className="summary-col">월간 요약</th>
+              <th className="label-col">
+                운영 대상 / 지표{resizeHandle("label")}
+              </th>
+              <th className="summary-col">
+                월간 요약{resizeHandle("summary")}
+              </th>
               {ds.map((date) => (
                 <th
                   key={date}
@@ -536,6 +657,12 @@ export function OperatingSheet({
             </tr>
             {visible.map((r) => {
               const row = r.metricRow;
+              const siblings = row?.metric
+                ? metricGroup(data.metrics, row.metric)
+                : [];
+              const metricIndex = siblings.findIndex(
+                (m) => m.id === row?.metric?.id,
+              );
               const children = rows
                 .filter(
                   (child) => child.parentIds.includes(r.id) && child.metricRow,
@@ -624,6 +751,89 @@ export function OperatingSheet({
                         >
                           ＋
                         </button>
+                      )}
+                      {(r.edit?.collection === "channels" ||
+                        r.edit?.collection === "contents") && (
+                        <button
+                          className="row-add"
+                          title="세부 지표 추가"
+                          aria-label={`${r.label} 지표 추가`}
+                          onClick={() => {
+                            const content = data.contents.find(
+                              (c) => c.id === r.id,
+                            );
+                            const ch = data.channels.find(
+                              (c) => c.id === (content?.channel_id ?? r.id),
+                            );
+                            const profile =
+                              content && isBusinessProfile(content);
+                            onEdit({
+                              collection: "metrics",
+                              record: {
+                                channel_id: ch?.id,
+                                scope: profile
+                                  ? "total"
+                                  : ch?.measurement_template === "paid_ad" ||
+                                      ch?.measurement_template === "search_ad"
+                                    ? "paid"
+                                    : "total",
+                                key_prefix: profile ? "bizProfile" : "",
+                                sort_order:
+                                  Math.max(
+                                    0,
+                                    ...data.metrics
+                                      .filter((m) => m.channel_id === ch?.id)
+                                      .map((m) => m.sort_order),
+                                  ) + 1,
+                              },
+                            });
+                          }}
+                        >
+                          지표＋
+                        </button>
+                      )}
+                      {row?.metric && (
+                        <span className="metric-actions">
+                          {([-1, 1] as const).map((direction) => (
+                            <button
+                              key={direction}
+                              disabled={
+                                metricBusy ||
+                                (direction === -1
+                                  ? metricIndex === 0
+                                  : metricIndex === siblings.length - 1)
+                              }
+                              aria-label={`${r.label} ${direction === -1 ? "위로" : "아래로"}`}
+                              onClick={() => {
+                                setMetricBusy(true);
+                                void onMetricMove(row.metric!.id, direction)
+                                  .catch(() => {})
+                                  .finally(() => setMetricBusy(false));
+                              }}
+                            >
+                              {direction === -1 ? "↑" : "↓"}
+                            </button>
+                          ))}
+                          <button
+                            disabled={metricBusy}
+                            aria-label={`${r.label} 지표 삭제`}
+                            title="지표 삭제 · 입력값 보존"
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  `‘${r.label}’ 지표를 삭제할까요? 같은 채널의 소재에 공통 적용되며 입력값은 보존됩니다.`,
+                                )
+                              )
+                                return;
+                              setMetricBusy(true);
+                              void onMetricDelete(row.metric!.id, true)
+                                .catch(() => {})
+                                .finally(() => setMetricBusy(false));
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
                       )}
                     </div>
                   </th>

@@ -19,6 +19,45 @@ const {
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+const { moveMetric, metricGroup } = require("../src/lib/metric-order.ts");
+
+test("지표 이동은 중복 순번도 정리하고 다른 채널·프로필·광고 지표를 섞지 않는다", () => {
+  const d = fixture();
+  d.metrics.forEach((m) => {
+    m.sort_order = 0;
+  });
+  const group = metricGroup(
+    d.metrics,
+    d.metrics.find((m) => m.scope === "total"),
+  );
+  const moved = moveMetric(d.metrics, group[1].id, -1);
+  assert.equal(moved[0].id, group[1].id);
+  assert.deepEqual(
+    moved.map((m) => m.sort_order),
+    moved.map((_, i) => i),
+  );
+  assert.ok(moved.every((m) => m.scope === "total"));
+  assert.ok(d.metrics.every((m) => m.sort_order === 0));
+  assert.deepEqual(moveMetric(d.metrics, group[0].id, -1), []);
+  const extra = { ...group[0], id: "profile", key: "bizProfileCustom" };
+  assert.deepEqual(
+    metricGroup([...d.metrics, extra], extra).map((m) => m.id),
+    ["profile"],
+  );
+});
+
+test("삭제 지표는 이동에서 제외하고 순서 변경은 기록의 의미를 바꾸지 않는다", () => {
+  const d = fixture();
+  const group = metricGroup(d.metrics, d.metrics[0]);
+  group[1].deleted_at = "2026-09-14";
+  const moved = moveMetric(d.metrics, group[0].id, 1);
+  assert.equal(moved[0].id, group[2].id);
+  assert.ok(moved.every((m) => !m.deleted_at));
+  for (const metric of moved) {
+    const original = d.metrics.find((m) => m.id === metric.id);
+    assert.deepEqual({ ...metric, sort_order: original.sort_order }, original);
+  }
+});
 const { rollupOptions, rollupValue } = require("../src/lib/sheet-rollup.ts");
 
 test("인스타 광고비 첫 입력은 기간 사전 설정 없이 저장 대상을 연결한다", async () => {

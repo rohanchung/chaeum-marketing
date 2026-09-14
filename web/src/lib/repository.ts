@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { CellChange, Data, metricTemplate } from "./domain";
+import { CellChange, Data, Metric, metricTemplate } from "./domain";
 export const tables = {
   channels: "channels",
   contents: "contents",
@@ -72,6 +72,27 @@ export async function saveCells(workspace: string, cells: CellChange[]) {
     p_workspace: workspace,
     p_cells: cells,
   });
+  if (error) throw new Error(error.message);
+}
+export async function saveMetricOrder(workspace: string, metrics: Metric[]) {
+  if (!metrics.length) return;
+  const { error } = await supabase.from("mkt_metrics").upsert(
+    metrics.map((m) => ({
+      id: m.id,
+      workspace_id: workspace,
+      channel_id: m.channel_id,
+      key: m.key,
+      name: m.name,
+      scope: m.scope,
+      unit: m.unit,
+      mode: m.mode,
+      numerator: m.numerator,
+      denominator: m.denominator,
+      multiplier: m.multiplier,
+      sort_order: m.sort_order,
+      deleted_at: m.deleted_at,
+    })),
+  );
   if (error) throw new Error(error.message);
 }
 export async function saveChannel(

@@ -236,7 +236,7 @@ export function Editor({
         patch = {
           ...(r.id ? { id: r.id } : {}),
           name: get("name"),
-          key: r.key ?? crypto.randomUUID(),
+          key: r.key ?? `${r.key_prefix ?? ""}${crypto.randomUUID()}`,
           channel_id: metricScope === "funnel" ? null : get("channel_id"),
           scope: metricScope,
           mode: metricScope === "funnel" ? "daily" : metricMode,
