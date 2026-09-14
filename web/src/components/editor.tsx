@@ -11,6 +11,7 @@ import {
   categories,
 } from "@/lib/domain";
 import { Collection } from "@/lib/repository";
+import { CarrotGuide } from "./carrot-guide";
 export type EditorState = {
   collection: Collection;
   record?: Record<string, unknown>;
@@ -92,6 +93,7 @@ export function Editor({
   busy,
   onSave,
   onClose,
+  today = localDate(),
 }: {
   state: EditorState;
   data: Data;
@@ -101,6 +103,7 @@ export function Editor({
     record: Record<string, unknown>,
   ) => Promise<void>;
   onClose: () => void;
+  today?: string;
 }) {
   const { collection, record: r = {} } = state;
   const form = useRef<HTMLFormElement>(null);
@@ -113,6 +116,13 @@ export function Editor({
     String(r.channel_id ?? ""),
   );
   const [source, setSource] = useState(sourceValue(r));
+  const channelTemplate = data.channels.find(
+    (c) => c.id === metricChannel,
+  )?.measurement_template;
+  const createWithAd =
+    collection === "contents" &&
+    !r.id &&
+    ["paid_ad", "search_ad"].includes(channelTemplate ?? "");
   const [paymentCustomer, setPaymentCustomer] = useState(
     String(r.customer_id ?? ""),
   );
@@ -181,7 +191,7 @@ export function Editor({
           channel_type: "other",
           is_active: true,
         };
-      if (collection === "contents")
+      if (collection === "contents") {
         patch = {
           ...patch,
           title: get("title"),
@@ -193,6 +203,19 @@ export function Editor({
           url: nullable("url"),
           status: r.status ?? "published",
         };
+        if (createWithAd) {
+          const start = get("ad_start"),
+            end = get("ad_end");
+          if (!start || !end || start > end)
+            throw new Error("광고 시작일과 종료일을 확인하세요.");
+          patch.content_type = "ad_creative";
+          patch.initial_promotion = {
+            start_date: start,
+            end_date: end,
+            title: `${get("title")} 광고`,
+          };
+        }
+      }
       if (collection === "events")
         patch = {
           ...patch,
@@ -367,16 +390,34 @@ export function Editor({
                   <input
                     name="published_at"
                     type="date"
-                    defaultValue={
-                      datePart(r.published_at as string) || localDate()
-                    }
+                    defaultValue={datePart(r.published_at as string) || today}
                   />
                 </Field>
               </div>
               <Field label="원본 링크">{input("url", "url")}</Field>
-              <p className="form-note">
-                광고는 소재를 만든 뒤 상세 화면에서 집행 기간을 추가합니다.
-              </p>
+              {createWithAd ? (
+                <fieldset className="ad-setup">
+                  <legend>광고 기간 · 저장하면 지표 입력 칸이 열립니다</legend>
+                  <div className="form-pair">
+                    <Field label="광고 시작일">
+                      {input("ad_start", "date", true, today)}
+                    </Field>
+                    <Field label="광고 종료일">
+                      {input("ad_end", "date", true, today)}
+                    </Field>
+                  </div>
+                  <p className="form-note">
+                    노출 · 클릭 · 반응 · 지출 입력 / 클릭률 · 클릭당 비용 자동
+                    계산
+                  </p>
+                </fieldset>
+              ) : (
+                <p className="form-note">
+                  광고 집행은 소재 상세 또는 시트의 ‘광고 지표 입력’에서
+                  추가하세요.
+                </p>
+              )}
+              {channelTemplate === "paid_ad" && <CarrotGuide />}
             </>
           )}
           {collection === "events" && (
@@ -388,9 +429,7 @@ export function Editor({
                     name="starts_at"
                     type="date"
                     required
-                    defaultValue={
-                      datePart(r.starts_at as string) || localDate()
-                    }
+                    defaultValue={datePart(r.starts_at as string) || today}
                   />
                 </Field>
                 <Field label="종료일">
@@ -434,16 +473,21 @@ export function Editor({
               </Field>
               <div className="form-pair">
                 <Field label="시작일">
-                  {input("start_date", "date", true, localDate())}
+                  {input("start_date", "date", true, today)}
                 </Field>
                 <Field label="종료일">
-                  {input("end_date", "date", true, localDate())}
+                  {input("end_date", "date", true, today)}
                 </Field>
               </div>
               <p className="form-note">
                 기간 내 광고 지표와 광고비만 입력할 수 있습니다. 종료 후에도
                 기록은 보존됩니다.
               </p>
+              {data.channels.find(
+                (ch) =>
+                  ch.id ===
+                  data.contents.find((c) => c.id === r.content_id)?.channel_id,
+              )?.measurement_template === "paid_ad" && <CarrotGuide />}
             </>
           )}
           {collection === "metrics" && (

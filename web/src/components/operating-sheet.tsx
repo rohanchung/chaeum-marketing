@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   CellChange,
   Data,
@@ -137,6 +137,9 @@ export function OperatingSheet({
   onSave,
   onDate,
   onDetail,
+  today,
+  clockSynced,
+  actions,
 }: {
   data: Data;
   period: Period;
@@ -144,12 +147,26 @@ export function OperatingSheet({
   onSave: (cells: CellChange[]) => Promise<void>;
   onDate: (date: string) => void;
   onDetail: (id: string) => void;
+  today: string;
+  clockSynced: boolean;
+  actions?: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [includeArchive, setIncludeArchive] = useState(false);
   const [error, setError] = useState("");
   const table = useRef<HTMLDivElement>(null);
   const ds = dates(period);
+  useEffect(() => {
+    const scroll = table.current;
+    const current = scroll?.querySelector<HTMLElement>("thead [data-today]");
+    if (!scroll) return;
+    const fixed =
+      (scroll.querySelector<HTMLElement>(".label-col")?.offsetWidth ?? 0) +
+      (scroll.querySelector<HTMLElement>(".summary-col")?.offsetWidth ?? 0);
+    scroll.scrollLeft = current
+      ? Math.max(0, current.offsetLeft - fixed - 70)
+      : 0;
+  }, [period.start, today]);
   const rows: DisplayRow[] = [];
   const metricRows = (
     metrics: Metric[],
@@ -235,50 +252,67 @@ export function OperatingSheet({
           2,
           [ch.id, c.id],
         );
-        data.promotions
-          .filter(
-            (p) =>
-              p.content_id === c.id &&
-              !p.deleted_at &&
-              p.start_date <= period.end &&
-              p.end_date >= period.start,
-          )
-          .forEach((p) => {
-            rows.push({
-              id: p.id,
-              label: p.title,
-              depth: 2,
-              parentIds: [ch.id, c.id],
-              detail: `광고 · ${p.start_date} ~ ${p.end_date}`,
-              edit: { collection: "promotions", record: p },
-            });
-            metricRows(
-              ms.filter((m) => m.scope === "paid"),
-              c.id,
-              p.id,
-              3,
-              [ch.id, c.id, p.id],
-              p.start_date,
-              p.end_date,
-            );
-            rows.push({
-              id: `cost:${p.id}`,
-              label: "광고비",
-              depth: 3,
-              parentIds: [ch.id, c.id, p.id],
-              detail: "비용 원장 · 지급액",
-              metricRow: {
-                id: p.id,
-                label: "광고비",
-                kind: "cost",
-                metric: null,
-                content_id: c.id,
-                promotion_id: p.id,
-                start: p.start_date,
-                end: p.end_date,
-              },
-            });
+        const promotions = data.promotions.filter(
+          (p) =>
+            p.content_id === c.id &&
+            !p.deleted_at &&
+            p.start_date <= period.end &&
+            p.end_date >= period.start,
+        );
+        if (ms.some((m) => m.scope === "paid") && promotions.length === 0) {
+          const hasPrevious = data.promotions.some(
+            (p) => p.content_id === c.id && !p.deleted_at,
+          );
+          rows.push({
+            id: `setup:${c.id}`,
+            label: hasPrevious
+              ? "이 달 광고 없음 · 집행 추가"
+              : "광고 지표 입력 · 기간 설정",
+            depth: 2,
+            parentIds: [ch.id, c.id],
+            detail: "노출 · 클릭 · 반응 · 지출 / 클릭률 자동 계산",
+            edit: {
+              collection: "promotions",
+              record: { content_id: c.id, start_date: today, end_date: today },
+            },
           });
+        }
+        promotions.forEach((p) => {
+          rows.push({
+            id: p.id,
+            label: p.title,
+            depth: 2,
+            parentIds: [ch.id, c.id],
+            detail: `광고 · ${p.start_date} ~ ${p.end_date}`,
+            edit: { collection: "promotions", record: p },
+          });
+          metricRows(
+            ms.filter((m) => m.scope === "paid"),
+            c.id,
+            p.id,
+            3,
+            [ch.id, c.id, p.id],
+            p.start_date,
+            p.end_date,
+          );
+          rows.push({
+            id: `cost:${p.id}`,
+            label: ch.measurement_template === "paid_ad" ? "지출" : "광고비",
+            depth: 3,
+            parentIds: [ch.id, c.id, p.id],
+            detail: "비용 원장 · 지급액",
+            metricRow: {
+              id: p.id,
+              label: ch.measurement_template === "paid_ad" ? "지출" : "광고비",
+              kind: "cost",
+              metric: null,
+              content_id: c.id,
+              promotion_id: p.id,
+              start: p.start_date,
+              end: p.end_date,
+            },
+          });
+        });
       });
     });
   const visible = rows.filter((r) => !r.parentIds.some((id) => collapsed[id]));
@@ -344,8 +378,21 @@ export function OperatingSheet({
   return (
     <section className="sheet-card">
       <div className="sheet-tools">
-        <span>날짜별 운영 시트</span>
+        <span>
+          운영 시트{" "}
+          <small
+            className="today-status"
+            title={
+              clockSynced
+                ? "서버 시간 · Asia/Seoul"
+                : "서버 확인 전 기기 시간 · Asia/Seoul"
+            }
+          >
+            오늘 {today} · {clockSynced ? "한국 시간" : "시간 확인 중"}
+          </small>
+        </span>
         <div>
+          {actions}
           <label className="check">
             <input
               type="checkbox"
@@ -373,10 +420,13 @@ export function OperatingSheet({
               {ds.map((date) => (
                 <th
                   key={date}
+                  aria-current={date === today ? "date" : undefined}
+                  data-today={date === today ? "true" : undefined}
                   className={
-                    new Date(`${date}T12:00:00Z`).getUTCDay() === 0
+                    (date === today ? "today-col " : "") +
+                    (new Date(`${date}T12:00:00Z`).getUTCDay() === 0
                       ? "sunday"
-                      : ""
+                      : "")
                   }
                 >
                   <button
@@ -420,7 +470,7 @@ export function OperatingSheet({
                     style={{ paddingLeft: 14 + r.depth * 16 }}
                   >
                     <div className="row-label">
-                      {!row && (
+                      {!row && !r.id.startsWith("setup:") && (
                         <button
                           className="toggle"
                           aria-label={`${r.label} ${collapsed[r.id] ? "펼치기" : "접기"}`}
@@ -433,7 +483,7 @@ export function OperatingSheet({
                       )}
                       <button
                         className="row-name"
-                        title={r.detail}
+                        title={`${r.label}${r.detail ? ` · ${r.detail}` : ""}`}
                         onClick={() =>
                           r.edit?.collection === "contents"
                             ? onDetail(r.id)
@@ -477,8 +527,10 @@ export function OperatingSheet({
                   {ds.map((date, di) => (
                     <td
                       key={date}
+                      data-today={date === today ? "true" : undefined}
                       className={
-                        row && !allowed(row, date) ? "out-of-period" : ""
+                        (date === today ? "today-col " : "") +
+                        (row && !allowed(row, date) ? "out-of-period" : "")
                       }
                     >
                       {row &&

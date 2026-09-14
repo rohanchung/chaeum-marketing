@@ -316,6 +316,12 @@ export function metricTemplate(template: string): Seed[] {
     ["reactions", "반응수"],
   ])
     add(k, n, "paid");
+  if (template === "paid_ad") {
+    add("paidReach", "도달", "paid", "latest");
+    add("regulars", "단골", "paid");
+    add("interests", "관심", "paid");
+    add("couponDownloads", "쿠폰 다운로드", "paid");
+  }
   add("ctr", "클릭률", "paid", "ratio", "percent", "clicks", "impressions");
   add("cpc", "클릭당 비용", "paid", "ratio", "currency", "$spend", "clicks", 1);
   add(

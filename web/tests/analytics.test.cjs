@@ -98,6 +98,63 @@ function payment(d, id, amount, cost, date = "2026-09-03") {
     adjusts_id: null,
   });
 }
+test("server date crosses Korean midnight without trusting the device date", () => {
+  const { projectedServerDate } = require("../src/lib/server-date.ts");
+  assert.equal(projectedServerDate("2026-09-13T14:59:59Z", 0), "2026-09-13");
+  assert.equal(projectedServerDate("2026-09-13T14:59:59Z", 2000), "2026-09-14");
+  assert.equal(projectedServerDate("2026-12-31T14:59:59Z", 2000), "2027-01-01");
+  assert.throws(() => projectedServerDate("invalid", 0));
+});
+
+test("Carrot template exposes raw metrics, independent reaction details, and computed ratios", () => {
+  const d = fixture();
+  d.metrics = metricTemplate("paid_ad").map((m, i) => ({
+    ...base,
+    ...m,
+    id: `carrot${i}`,
+    channel_id: "ch",
+  }));
+  for (const [key, value] of [
+    ["impressions", 1000],
+    ["clicks", 20],
+    ["reactions", 5],
+    ["regulars", 2],
+    ["interests", 2],
+    ["couponDownloads", 1],
+  ])
+    observation(d, key, value, "2026-09-01", "paid");
+  d.costs = [
+    {
+      ...base,
+      ...source,
+      id: "spend",
+      promotion_id: "promo",
+      expense_date: "2026-09-01",
+      category: "media",
+      payment_status: "paid",
+      amount: 10000,
+    },
+  ];
+  assert.equal(metricValue(d, row(d, "ctr", "paid"), period).value, 2);
+  assert.equal(metricValue(d, row(d, "cpc", "paid"), period).value, 500);
+  assert.equal(metricValue(d, row(d, "reactions", "paid"), period).value, 5);
+  assert.equal(row(d, "ctr", "paid").metric.mode, "ratio");
+  assert.equal(d.metrics.filter((m) => m.mode === "ratio").length, 3);
+});
+
+test("Carrot reach preserves the latest observation without summing repeated people", () => {
+  const d = fixture();
+  d.metrics = metricTemplate("paid_ad").map((m, i) => ({
+    ...base,
+    ...m,
+    id: `carrot${i}`,
+    channel_id: "ch",
+  }));
+  observation(d, "paidReach", 1484, "2026-09-01", "paid");
+  observation(d, "paidReach", 1200, "2026-09-02", "paid");
+  assert.equal(metricValue(d, row(d, "paidReach", "paid"), period).value, 1200);
+});
+
 test("independent metrics, corrected cumulative snapshots use last value, not MAX or sum", () => {
   const d = fixture();
   observation(d, "views", 1000, "2026-09-01");

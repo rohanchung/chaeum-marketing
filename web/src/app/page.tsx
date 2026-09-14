@@ -31,6 +31,7 @@ import { report, sourceName } from "@/lib/analytics";
 import {
   Collection,
   saveChannel,
+  saveAdContent,
   downloadJSON,
   exportBackup,
   loadData,
@@ -41,11 +42,14 @@ import {
 import { downloadExcelReport, openPrintableReport } from "@/lib/report-export";
 import { Editor, EditorState } from "@/components/editor";
 import { OperatingSheet } from "@/components/operating-sheet";
+import { useServerDate } from "@/components/use-server-date";
 
 const tabs = ["대시보드", "콘텐츠", "이벤트", "분석", "리포트"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
 export default function Home() {
   const [workspace, setWorkspace] = useState<string | null>(null);
+  const { today, synced: clockSynced } = useServerDate(!!workspace);
+  const clockInitialized = useRef(false);
   const [initializing, setInitializing] = useState(true);
   const [data, setData] = useState<Data>(emptyData);
   const [nav, setNav] = useState("대시보드");
@@ -67,6 +71,13 @@ export default function Home() {
   const generation = useRef(0);
   const stateRef = useRef(data);
   const backupInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (clockSynced && !clockInitialized.current) {
+      clockInitialized.current = true;
+      setMonth(today.slice(0, 7));
+      setDay(today);
+    }
+  }, [today, clockSynced]);
   const period = useMemo(
     () =>
       nav === "대시보드" || range === "month"
@@ -199,6 +210,8 @@ export default function Home() {
         });
       } else if (collection === "channels")
         await saveChannel(workspace, record);
+      else if (collection === "contents" && record.initial_promotion)
+        await saveAdContent(workspace, record);
       else await saveRecord(workspace, collection, record);
       await refresh(workspace);
       setNotice("저장했습니다.");
@@ -495,11 +508,11 @@ export default function Home() {
             )}
             <button
               onClick={() => {
-                setMonth(localDate().slice(0, 7));
-                setDay(localDate());
+                setMonth(today.slice(0, 7));
+                setDay(today);
               }}
             >
-              이번 달
+              오늘 {today.slice(5).replace("-", "/")}
             </button>
             {nav === "대시보드" && (
               <details className="quick-menu">
@@ -554,40 +567,11 @@ export default function Home() {
             {nav === "대시보드" && (
               <>
                 <Kpis report={currentReport} compact />
-                <div className="inline-tools">
-                  {undo && (
-                    <button
-                      disabled={!!busy}
-                      onClick={() => {
-                        const prev = undo;
-                        void saveGrid(prev)
-                          .then(() => setUndo(null))
-                          .catch(() => {});
-                      }}
-                    >
-                      ↶ 마지막 입력 되돌리기
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setNav("분석");
-                      setAnalysisTab("비용");
-                    }}
-                  >
-                    비용 원장
-                  </button>
-                  <button
-                    onClick={() => {
-                      setNav("분석");
-                      setAnalysisTab("결제");
-                    }}
-                  >
-                    매출 기록
-                  </button>
-                </div>
                 <OperatingSheet
                   data={data}
                   period={period}
+                  today={today}
+                  clockSynced={clockSynced}
                   onEdit={edit}
                   onSave={saveGrid}
                   onDate={(date) =>
@@ -597,6 +581,39 @@ export default function Home() {
                     })
                   }
                   onDetail={setDetail}
+                  actions={
+                    <div className="inline-tools">
+                      {undo && (
+                        <button
+                          disabled={!!busy}
+                          onClick={() => {
+                            const prev = undo;
+                            void saveGrid(prev)
+                              .then(() => setUndo(null))
+                              .catch(() => {});
+                          }}
+                        >
+                          ↶ 마지막 입력 되돌리기
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setNav("분석");
+                          setAnalysisTab("비용");
+                        }}
+                      >
+                        비용 원장
+                      </button>
+                      <button
+                        onClick={() => {
+                          setNav("분석");
+                          setAnalysisTab("결제");
+                        }}
+                      >
+                        매출 기록
+                      </button>
+                    </div>
+                  }
                 />
               </>
             )}
@@ -1284,6 +1301,7 @@ export default function Home() {
           state={editor}
           data={data}
           busy={!!busy}
+          today={today}
           onSave={mutate}
           onClose={() => setEditor(null)}
         />
@@ -1397,7 +1415,7 @@ function Kpis({
         ],
       ];
   return (
-    <div className="kpi-grid">
+    <div className={`kpi-grid${compact ? " kpi-compact" : ""}`}>
       {cards.map(([label, value, hint], i) => (
         <article key={label} className={`kpi ${i === 3 ? "accent" : ""}`}>
           <span>{label}</span>

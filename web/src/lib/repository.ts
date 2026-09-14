@@ -85,6 +85,18 @@ export async function saveChannel(
   });
   if (error) throw new Error(error.message);
 }
+export async function saveAdContent(
+  workspace: string,
+  record: Record<string, unknown>,
+) {
+  const { initial_promotion, ...content } = record;
+  const { error } = await supabase.rpc("mkt_create_ad_content", {
+    p_workspace: workspace,
+    p_content: content,
+    p_promotion: initial_promotion,
+  });
+  if (error) throw new Error(error.message);
+}
 export async function exportBackup(workspace: string) {
   const extra = [
     "performance_records",
