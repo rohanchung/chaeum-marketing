@@ -1745,6 +1745,72 @@ textarea {
   font-size: 12px;
   font-weight: 600;
 }
+
+.update-log h1 {
+  margin: 0;
+  font-size: 18px;
+}
+.log-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.log-search input {
+  width: 210px;
+}
+.update-log-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.update-log-list > li {
+  border-top: 1px solid var(--border, #dce4df);
+}
+.update-log-list summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 0;
+  cursor: pointer;
+}
+.update-log-list summary::before {
+  content: "▸";
+  color: #527263;
+}
+.update-log-list details[open] > summary::before {
+  content: "▾";
+}
+.update-log-list time,
+.update-log-list summary > span {
+  font-size: 11px;
+  color: #63756b;
+}
+.update-log-list strong {
+  font-size: 13px;
+}
+.update-log-list summary > span {
+  margin-left: auto;
+}
+.update-log-list ul {
+  margin: 0 0 10px 20px;
+  padding-left: 14px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+@media (max-width: 640px) {
+  .log-search {
+    width: 100%;
+  }
+  .log-search input {
+    flex: 1;
+    min-width: 0;
+  }
+  .update-log-list summary > span {
+    display: none;
+  }
+}
 .purchase-item {
   display: flex;
   flex-wrap: wrap;

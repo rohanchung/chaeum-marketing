@@ -5,6 +5,7 @@ export const navigationTabs = [
   "구매",
   "분석",
   "리포트",
+  "로그",
 ];
 const routes = [
   "dashboard",
@@ -13,6 +14,7 @@ const routes = [
   "purchases",
   "analysis",
   "reports",
+  "logs",
 ];
 export function navigationTab(hash: string) {
   return (

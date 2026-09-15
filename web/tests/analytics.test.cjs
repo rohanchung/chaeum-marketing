@@ -332,6 +332,11 @@ test("메뉴 전환은 기록을 추가하고 뒤로·앞으로 이전 메뉴와
   navigateTab(browser, "리포트");
   assert.equal(urls.length, 3);
   assert.equal(navigationTab(browser.location.hash), "리포트");
+  navigateTab(browser, "로그");
+  assert.equal(navigationTab(browser.location.hash), "로그");
+  assert.equal(browser.location.hash, "#logs");
+  cursor--;
+  assert.equal(navigationTab(browser.location.hash), "리포트");
 });
 test("채널 이동은 순서를 재저장하고 새 채널은 뒤에 추가하며 고정 패널은 제외한다", () => {
   const channels = [

@@ -54,9 +54,10 @@ import { resolveSheetCells } from "@/lib/sheet-ad";
 import { moveMetric } from "@/lib/metric-order";
 import { moveChannel } from "@/lib/channel-order";
 import { eventCost, unitCost, usedQuantity } from "@/lib/purchases";
+import { UpdateLog } from "@/components/update-log";
 import { useNavigation } from "@/components/use-navigation";
 
-const tabs = ["대시보드", "콘텐츠", "이벤트", "구매", "분석", "리포트"];
+const tabs = ["대시보드", "콘텐츠", "이벤트", "구매", "분석", "리포트", "로그"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
 export default function Home() {
   const [workspace, setWorkspace] = useState<string | null>(null);
@@ -500,97 +501,99 @@ export default function Home() {
                   ? "저장된 기록과 동기화됨"
                   : "데이터 확인 필요"}
           </div>
-          <div className="toolbar-controls">
-            {nav !== "대시보드" && (
-              <div className="segmented">
-                {[
-                  ["day", "일"],
-                  ["month", "월"],
-                  ["year", "연"],
-                ].map(([v, l]) => (
-                  <button
-                    key={v}
-                    className={range === v ? "selected" : ""}
-                    onClick={() => setRange(v)}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-            )}
-            {nav === "대시보드" || range === "month" ? (
-              <>
-                <button aria-label="이전 달" onClick={() => moveMonth(-1)}>
-                  ‹
-                </button>
-                <input
-                  aria-label="조회 월"
-                  type="month"
-                  value={month}
-                  onChange={(e) => {
-                    if (e.target.value) setMonth(e.target.value);
-                  }}
-                />
-                <button aria-label="다음 달" onClick={() => moveMonth(1)}>
-                  ›
-                </button>
-              </>
-            ) : range === "year" ? (
-              <input
-                aria-label="조회 연도"
-                type="number"
-                min="2000"
-                max="2200"
-                value={month.slice(0, 4)}
-                onChange={(e) => {
-                  if (e.target.value.length === 4)
-                    setMonth(`${e.target.value}-01`);
-                }}
-              />
-            ) : (
-              <input
-                aria-label="조회 날짜"
-                type="date"
-                value={day}
-                onChange={(e) => {
-                  if (e.target.value) setDay(e.target.value);
-                }}
-              />
-            )}
-            <button
-              onClick={() => {
-                setMonth(today.slice(0, 7));
-                setDay(today);
-              }}
-            >
-              오늘 {today.slice(5).replace("-", "/")}
-            </button>
-            {nav === "대시보드" && (
-              <details className="quick-menu">
-                <summary className="primary">＋ 빠른 입력</summary>
-                <div>
+          {nav !== "로그" && (
+            <div className="toolbar-controls">
+              {nav !== "대시보드" && (
+                <div className="segmented">
                   {[
-                    ["contents", "소재 추가"],
-                    ["costs", "비용 기록"],
-                    ["customers", "고객·전환 기록"],
-                    ["payments", "결제·환불 기록"],
-                    ["events", "이벤트 기록"],
-                    ["channels", "채널 추가"],
-                  ].map(([c, l]) => (
+                    ["day", "일"],
+                    ["month", "월"],
+                    ["year", "연"],
+                  ].map(([v, l]) => (
                     <button
-                      key={c}
-                      onClick={(e) => {
-                        e.currentTarget.closest("details")!.open = false;
-                        edit({ collection: c as Collection });
-                      }}
+                      key={v}
+                      className={range === v ? "selected" : ""}
+                      onClick={() => setRange(v)}
                     >
                       {l}
                     </button>
                   ))}
                 </div>
-              </details>
-            )}
-          </div>
+              )}
+              {nav === "대시보드" || range === "month" ? (
+                <>
+                  <button aria-label="이전 달" onClick={() => moveMonth(-1)}>
+                    ‹
+                  </button>
+                  <input
+                    aria-label="조회 월"
+                    type="month"
+                    value={month}
+                    onChange={(e) => {
+                      if (e.target.value) setMonth(e.target.value);
+                    }}
+                  />
+                  <button aria-label="다음 달" onClick={() => moveMonth(1)}>
+                    ›
+                  </button>
+                </>
+              ) : range === "year" ? (
+                <input
+                  aria-label="조회 연도"
+                  type="number"
+                  min="2000"
+                  max="2200"
+                  value={month.slice(0, 4)}
+                  onChange={(e) => {
+                    if (e.target.value.length === 4)
+                      setMonth(`${e.target.value}-01`);
+                  }}
+                />
+              ) : (
+                <input
+                  aria-label="조회 날짜"
+                  type="date"
+                  value={day}
+                  onChange={(e) => {
+                    if (e.target.value) setDay(e.target.value);
+                  }}
+                />
+              )}
+              <button
+                onClick={() => {
+                  setMonth(today.slice(0, 7));
+                  setDay(today);
+                }}
+              >
+                오늘 {today.slice(5).replace("-", "/")}
+              </button>
+              {nav === "대시보드" && (
+                <details className="quick-menu">
+                  <summary className="primary">＋ 빠른 입력</summary>
+                  <div>
+                    {[
+                      ["contents", "소재 추가"],
+                      ["costs", "비용 기록"],
+                      ["customers", "고객·전환 기록"],
+                      ["payments", "결제·환불 기록"],
+                      ["events", "이벤트 기록"],
+                      ["channels", "채널 추가"],
+                    ].map(([c, l]) => (
+                      <button
+                        key={c}
+                        onClick={(e) => {
+                          e.currentTarget.closest("details")!.open = false;
+                          edit({ collection: c as Collection });
+                        }}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
         </div>
         {error && (
           <div className="error-box" role="alert">
@@ -1254,6 +1257,7 @@ export default function Home() {
                 )}
               </>
             )}
+            {nav === "로그" && <UpdateLog />}
             {nav === "리포트" && (
               <>
                 <PageTitle
