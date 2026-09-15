@@ -20,6 +20,101 @@ const {
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
 const {
+  parseRank,
+  rankText,
+  rankSummary,
+} = require("../src/lib/keyword-ranks.ts");
+test("순위는 정수이며 미노출·미입력과 구분한다", () => {
+  assert.equal(parseRank("3위"), 3);
+  assert.equal(parseRank("미노출"), 0);
+  assert.equal(parseRank(""), null);
+  for (const input of ["0", "-1", "1.5", "NaN"])
+    assert.throws(() => parseRank(input));
+  assert.equal(rankText(0), "미노출");
+  assert.equal(rankText(null), "—");
+});
+test("키워드 순위는 최근값·상승하락이며 서로 합산하지 않는다", () => {
+  const d = structuredClone(emptyData);
+  const metric = {
+    ...base,
+    id: "rank",
+    channel_id: "naver",
+    key: "keywordRankMobile",
+    unit: "rank",
+    mode: "latest",
+    scope: "total",
+    name: "모바일 순위",
+  };
+  const keyword = {
+    ...base,
+    id: "keyword",
+    channel_id: "naver",
+    content_type: "search_keyword",
+  };
+  d.metrics.push(metric);
+  d.contents.push(keyword);
+  const row = {
+    id: "r",
+    metric,
+    kind: "metric",
+    content_id: "keyword",
+    promotion_id: null,
+  };
+  for (const [date, value] of [
+    ["2026-08-31", 10],
+    ["2026-09-01", 8],
+    ["2026-09-02", 3],
+    ["2026-09-03", null],
+  ])
+    d.values.push({
+      ...base,
+      id: date,
+      metric_id: "rank",
+      content_id: "keyword",
+      promotion_id: null,
+      metric_date: date,
+      value,
+    });
+  assert.equal(metricValue(d, row, period).value, 3);
+  assert.equal(rankSummary(d, row, period), "3위 · ↑5 · 최고 3위");
+  assert.equal(
+    rankSummary(d, row, { start: "2026-09-01", end: "2026-09-01" }),
+    "8위 · ↑2 · 최고 8위",
+  );
+  d.values.push({
+    ...base,
+    id: "absent",
+    metric_id: "rank",
+    content_id: "keyword",
+    promotion_id: null,
+    metric_date: "2026-09-04",
+    value: 0,
+  });
+  assert.equal(rankSummary(d, row, period), "미노출 · 미노출 전환 · 최고 3위");
+  const { rollupValue } = require("../src/lib/sheet-rollup.ts");
+  assert.equal(
+    rollupValue(
+      d,
+      [row, { ...row, content_id: "second" }],
+      { channelId: "naver" },
+      "metric:rank",
+      period,
+    ),
+    null,
+  );
+  assert.equal(summary(d, period).spend, 0);
+  const { metricsForContent } = require("../src/lib/domain.ts");
+  assert.equal(metricsForContent(d.metrics, keyword).length, 1);
+  assert.equal(
+    metricsForContent(d.metrics, { ...keyword, content_type: "blog" }).length,
+    0,
+  );
+  assert.equal(
+    metricsForContent(d.metrics, { ...keyword, keyword_metric_ids: [] }).length,
+    0,
+  );
+});
+const {
   withPurchaseCosts,
   eventCost,
   usedQuantity,

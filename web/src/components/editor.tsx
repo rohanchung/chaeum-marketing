@@ -109,6 +109,11 @@ export function Editor({
   today?: string;
 }) {
   const { collection, record: r = {} } = state;
+  const keyword = r.content_type === "search_keyword";
+  const rankMetric = r.unit === "rank" || r.key_prefix === "keywordRank";
+  const [keywordMetrics, setKeywordMetrics] = useState<string[] | null>(
+    (r.keyword_metric_ids as string[] | null) ?? null,
+  );
   const form = useRef<HTMLFormElement>(null);
   const [error, setError] = useState("");
   const [items, setItems] = useState<ItemSelection[]>(() =>
@@ -129,7 +134,10 @@ export function Editor({
     (c) => c.id === metricChannel,
   )?.measurement_template;
   const createWithAd =
-    collection === "contents" && !r.id && channelTemplate === "search_ad";
+    collection === "contents" &&
+    !r.id &&
+    !keyword &&
+    channelTemplate === "search_ad";
   const [paymentCustomer, setPaymentCustomer] = useState(
     String(r.customer_id ?? ""),
   );
@@ -203,7 +211,10 @@ export function Editor({
           ...patch,
           title: get("title"),
           channel_id: get("channel_id"),
-          content_type: get("content_type"),
+          content_type: keyword
+            ? "search_keyword"
+            : get("content_type") || r.content_type,
+          ...(keyword ? { keyword_metric_ids: keywordMetrics } : {}),
           published_at: get("published_at")
             ? timestamp(get("published_at"))
             : null,
@@ -268,9 +279,13 @@ export function Editor({
           name: get("name"),
           key: r.key ?? `${r.key_prefix ?? ""}${crypto.randomUUID()}`,
           channel_id: metricScope === "funnel" ? null : get("channel_id"),
-          scope: metricScope,
-          mode: metricScope === "funnel" ? "daily" : metricMode,
-          unit: get("unit"),
+          scope: rankMetric ? "total" : metricScope,
+          mode: rankMetric
+            ? "latest"
+            : metricScope === "funnel"
+              ? "daily"
+              : metricMode,
+          unit: rankMetric ? "rank" : get("unit"),
           sort_order: Number(get("sort_order")),
           numerator: metricMode === "ratio" ? nullable("numerator") : null,
           denominator: metricMode === "ratio" ? nullable("denominator") : null,
@@ -380,7 +395,7 @@ export function Editor({
           <div>
             <small>로한 마케팅</small>
             <h2 id="editor-title">
-              {titles[collection]} {r.id ? "수정" : "추가"}
+              {keyword ? "키워드" : titles[collection]} {r.id ? "수정" : "추가"}
             </h2>
           </div>
           <button aria-label="닫기" disabled={busy} onClick={onClose}>
@@ -416,14 +431,20 @@ export function Editor({
           )}
           {collection === "contents" && (
             <>
-              <Field label="소재 제목">{input("title", "text", true)}</Field>
+              <Field label={keyword ? "검색 키워드" : "소재 제목"}>
+                {input("title", "text", true)}
+              </Field>
               {channel}
               <div className="form-pair">
                 <Field label="형식">
                   <select
+                    disabled={keyword}
                     name="content_type"
                     defaultValue={text("content_type", "post")}
                   >
+                    {keyword && (
+                      <option value="search_keyword">검색 키워드</option>
+                    )}
                     <option value="post">게시물</option>
                     <option value="reel">릴스</option>
                     <option value="blog">블로그 글</option>
@@ -434,7 +455,7 @@ export function Editor({
                     <option value="other">기타</option>
                   </select>
                 </Field>
-                <Field label="발행일">
+                <Field label={keyword ? "관리 시작일" : "발행일"}>
                   <input
                     name="published_at"
                     type="date"
@@ -442,8 +463,78 @@ export function Editor({
                   />
                 </Field>
               </div>
-              <Field label="원본 링크">{input("url", "url")}</Field>
-              {createWithAd ? (
+              <Field label={keyword ? "확인 대상 주소 (선택)" : "원본 링크"}>
+                {input("url", "url")}
+              </Field>
+              {keyword ? (
+                <>
+                  <p className="form-note">
+                    날짜별 셀에 순위를 입력합니다. 1위가 가장 높고, 미노출은
+                    ‘미노출’로 입력하세요. 월간 합산 없이 최근 순위와 변화를
+                    표시합니다.
+                  </p>
+                  <fieldset>
+                    <legend>표시할 기기·노출 영역</legend>
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={keywordMetrics === null}
+                        onChange={(e) =>
+                          setKeywordMetrics(
+                            e.target.checked
+                              ? null
+                              : data.metrics
+                                  .filter(
+                                    (m) =>
+                                      m.channel_id === metricChannel &&
+                                      m.unit === "rank" &&
+                                      !m.deleted_at,
+                                  )
+                                  .map((m) => m.id),
+                          )
+                        }
+                      />
+                      전체 · 새 영역도 자동 표시
+                    </label>
+                    {data.metrics
+                      .filter(
+                        (m) =>
+                          m.channel_id === metricChannel &&
+                          m.unit === "rank" &&
+                          !m.deleted_at,
+                      )
+                      .map((m) => (
+                        <label className="check" key={m.id}>
+                          <input
+                            type="checkbox"
+                            checked={
+                              keywordMetrics === null ||
+                              keywordMetrics.includes(m.id)
+                            }
+                            onChange={(e) => {
+                              const ids =
+                                keywordMetrics ??
+                                data.metrics
+                                  .filter(
+                                    (m) =>
+                                      m.channel_id === metricChannel &&
+                                      m.unit === "rank" &&
+                                      !m.deleted_at,
+                                  )
+                                  .map((m) => m.id);
+                              setKeywordMetrics(
+                                e.target.checked
+                                  ? [...ids, m.id]
+                                  : ids.filter((id) => id !== m.id),
+                              );
+                            }}
+                          />
+                          {m.name}
+                        </label>
+                      ))}
+                  </fieldset>
+                </>
+              ) : createWithAd ? (
                 <fieldset className="ad-setup">
                   <legend>광고 기간 · 저장하면 지표 입력 칸이 열립니다</legend>
                   <div className="form-pair">
@@ -595,9 +686,17 @@ export function Editor({
           )}
           {collection === "metrics" && (
             <>
+              {rankMetric && (
+                <p className="form-note">
+                  기기와 영역을 이름에 적으세요. 예: 모바일 · 블로그 순위. 순위
+                  정의는 채널의 키워드에 공통으로 추가되며 각 키워드 설정에서
+                  표시 여부를 선택합니다.
+                </p>
+              )}
               <Field label="지표 이름">{input("name", "text", true)}</Field>
               <Field label="측정 범위">
                 <select
+                  disabled={rankMetric}
                   value={metricScope}
                   onChange={(e) => setMetricScope(e.target.value)}
                 >
@@ -613,7 +712,7 @@ export function Editor({
                 <Field label="입력·집계 방식">
                   <select
                     value={metricScope === "funnel" ? "daily" : metricMode}
-                    disabled={metricScope === "funnel"}
+                    disabled={rankMetric || metricScope === "funnel"}
                     onChange={(e) => setMetricMode(e.target.value)}
                   >
                     {Object.entries(modeLabels).map(([key, label]) => (
@@ -625,10 +724,14 @@ export function Editor({
                 </Field>
                 <Field label="단위">
                   <select
+                    disabled={rankMetric}
                     name="unit"
                     value={metricUnit}
                     onChange={(e) => setMetricUnit(e.target.value)}
                   >
+                    {rankMetric && (
+                      <option value="rank">순위 (낮을수록 상위)</option>
+                    )}
                     <option value="count">건 / 명 / 회</option>
                     <option value="currency">원</option>
                     <option value="percent">%</option>

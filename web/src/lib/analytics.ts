@@ -337,7 +337,13 @@ export function report(d: Data, p: Period, annual = false): Report {
       promotion,
       metric: row.label,
       scope: row.metric ? scopeLabels[row.metric.scope] : "광고비",
-      aggregation: row.metric ? modeLabels[row.metric.mode] : "기간 합계",
+      aggregation:
+        row.metric?.unit === "rank"
+          ? "최근 순위 · 낮을수록 상위"
+          : row.metric
+            ? modeLabels[row.metric.mode]
+            : "기간 합계",
+      unit: row.metric?.unit,
       ...v,
     });
   };

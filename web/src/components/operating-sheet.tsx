@@ -1,5 +1,6 @@
 "use client";
 import { money } from "@/lib/domain";
+import { parseRank, rankText, rankSummary } from "@/lib/keyword-ranks";
 import { eventCost } from "@/lib/purchases";
 import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
 import {
@@ -14,6 +15,7 @@ import {
   number,
   scopeLabels,
   isBusinessProfile,
+  isSearchKeyword,
   metricsForContent,
 } from "@/lib/domain";
 import { metricValue } from "@/lib/analytics";
@@ -37,6 +39,7 @@ type DisplayRow = {
   fixedUnit?: string;
 };
 export function cellNumber(raw: string, metric: Metric | null): number | null {
+  if (metric?.unit === "rank") return parseRank(raw);
   const clean = raw.replaceAll(",", "").trim();
   if (clean === "" || clean === "—") return null;
   const v = Number(clean);
@@ -46,7 +49,10 @@ export function cellNumber(raw: string, metric: Metric | null): number | null {
     throw new Error("건수는 정수로 입력하세요.");
   return v;
 }
+const rankRaw = (v: number | null, rank: boolean) =>
+  v === null ? "" : rank && v === 0 ? "미노출" : String(v);
 function EditableCell({
+  rank = false,
   value,
   label,
   cellId,
@@ -54,6 +60,7 @@ function EditableCell({
   onMove,
   onPaste,
 }: {
+  rank?: boolean;
   value: number | null;
   label: string;
   cellId: string;
@@ -62,11 +69,11 @@ function EditableCell({
   onPaste: (raw: string) => Promise<void>;
 }) {
   const ref = useRef<HTMLInputElement>(null);
-  const committed = useRef(value === null ? "" : String(value));
+  const committed = useRef(rankRaw(value, rank));
   const dirty = useRef(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    const raw = value === null ? "" : String(value);
+    const raw = rankRaw(value, rank);
     if (
       ref.current &&
       document.activeElement !== ref.current &&
@@ -75,7 +82,7 @@ function EditableCell({
       ref.current.value = raw;
       committed.current = raw;
     }
-  }, [value]);
+  }, [value, rank]);
   async function commit() {
     const raw = ref.current?.value ?? "";
     if (raw === committed.current) return;
@@ -86,16 +93,16 @@ function EditableCell({
       await onSave(raw);
       dirty.current = false;
     } catch (e) {
-      committed.current = value === null ? "" : String(value);
+      committed.current = rankRaw(value, rank);
       setError(e instanceof Error ? e.message : "저장 실패");
     }
   }
   return (
     <input
       ref={ref}
-      defaultValue={value ?? ""}
+      defaultValue={rankRaw(value, rank)}
       data-cell={cellId}
-      inputMode="decimal"
+      inputMode={rank ? "text" : "decimal"}
       aria-label={label}
       aria-invalid={!!error}
       title={error || label}
@@ -108,7 +115,7 @@ function EditableCell({
       onBlur={() => void commit()}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
-          e.currentTarget.value = value === null ? "" : String(value);
+          e.currentTarget.value = rankRaw(value, rank);
           committed.current = e.currentTarget.value;
           dirty.current = false;
           setError("");
@@ -318,7 +325,10 @@ export function OperatingSheet({
         label: m.name,
         depth,
         parentIds: parents,
-        detail: `${scopeLabels[m.scope]} · ${modeLabels[m.mode]}`,
+        detail:
+          m.unit === "rank"
+            ? "순위 · 낮을수록 상위"
+            : `${scopeLabels[m.scope]} · ${modeLabels[m.mode]}`,
         edit: { collection: "metrics", record: m },
         metricRow: {
           id: m.id,
@@ -367,6 +377,22 @@ export function OperatingSheet({
       1,
       [ch.id],
     );
+    const keywordGroup = "keywords:" + ch.id;
+    if (
+      ch.name.startsWith("네이버") ||
+      data.contents.some((c) => c.channel_id === ch.id && isSearchKeyword(c))
+    )
+      rows.push({
+        id: keywordGroup,
+        label: "키워드 노출",
+        depth: 1,
+        parentIds: [ch.id],
+        detail: "모바일 · PC / 순위 직접 기록",
+        add: {
+          collection: "contents",
+          record: { channel_id: ch.id, content_type: "search_keyword" },
+        },
+      });
     const contents = data.contents
       .filter(
         (c) =>
@@ -375,9 +401,29 @@ export function OperatingSheet({
           (includeArchive || c.status !== "archived"),
       )
       .sort(
-        (a, b) => Number(isBusinessProfile(b)) - Number(isBusinessProfile(a)),
+        (a, b) =>
+          Number(isSearchKeyword(b)) - Number(isSearchKeyword(a)) ||
+          Number(isBusinessProfile(b)) - Number(isBusinessProfile(a)),
       );
     contents.forEach((c) => {
+      if (isSearchKeyword(c)) {
+        rows.push({
+          id: c.id,
+          label: c.title,
+          depth: 2,
+          parentIds: [ch.id, keywordGroup],
+          rollup: { contentId: c.id },
+          finance: false,
+          detail: "키워드 순위 · 합산하지 않음",
+          edit: { collection: "contents", record: c },
+        });
+        metricRows(metricsForContent(data.metrics, c), c.id, null, 3, [
+          ch.id,
+          keywordGroup,
+          c.id,
+        ]);
+        return;
+      }
       rows.push({
         id: c.id,
         label: c.title,
@@ -719,7 +765,12 @@ export function OperatingSheet({
                 .map((child) => child.metricRow!);
               const options =
                 r.rollup && !r.fixedRollup
-                  ? rollupOptions(children, r.finance !== false)
+                  ? rollupOptions(
+                      r.rollup.contentId
+                        ? children
+                        : children.filter((c) => c.metric?.unit !== "rank"),
+                      r.finance !== false,
+                    )
                   : [];
               const selected =
                 r.fixedRollup ??
@@ -731,6 +782,20 @@ export function OperatingSheet({
                 : r.fixedRollup === "roi"
                   ? "%"
                   : (options.find((o) => o.id === selected)?.unit ?? "");
+              const selectedRank = children.find(
+                (c) =>
+                  c.metric?.unit === "rank" &&
+                  "metric:" + c.metric.id === selected,
+              );
+              const showRollup = (p: Period, summary = false) =>
+                selectedRank
+                  ? summary
+                    ? rankSummary(data, selectedRank, p)
+                    : rankText(metricValue(data, selectedRank, p).value)
+                  : number(
+                      rollupValue(data, children, r.rollup!, selected!, p),
+                      rollupUnit,
+                    );
               const ri = editable.findIndex((e) => e.id === r.id);
               const aggregate = row ? metricValue(data, row, period) : null;
               const channel = data.channels.find(
@@ -880,7 +945,13 @@ export function OperatingSheet({
                         <button
                           className="row-add"
                           aria-label={`${r.label} 상세·수정`}
-                          onClick={() => onDetail(r.id)}
+                          onClick={() =>
+                            data.contents.some(
+                              (c) => c.id === r.id && isSearchKeyword(c),
+                            )
+                              ? onEdit(r.edit!)
+                              : onDetail(r.id)
+                          }
                         >
                           ⋯
                         </button>
@@ -907,27 +978,37 @@ export function OperatingSheet({
                             const ch = data.channels.find(
                               (c) => c.id === (content?.channel_id ?? r.id),
                             );
+                            const keyword = content && isSearchKeyword(content);
                             const profile =
                               content && isBusinessProfile(content);
                             onEdit({
                               collection: "metrics",
                               record: {
                                 channel_id: ch?.id,
-                                scope: profile
-                                  ? "total"
-                                  : !content &&
-                                      ch?.measurement_template === "custom" &&
-                                      !data.contents.some(
-                                        (c) =>
-                                          c.channel_id === ch.id &&
-                                          !c.deleted_at,
-                                      )
-                                    ? "channel"
-                                    : ch?.measurement_template === "paid_ad" ||
-                                        ch?.measurement_template === "search_ad"
-                                      ? "paid"
-                                      : "total",
-                                key_prefix: profile ? "bizProfile" : "",
+                                unit: keyword ? "rank" : "count",
+                                mode: keyword ? "latest" : "daily",
+                                scope:
+                                  keyword || profile
+                                    ? "total"
+                                    : !content &&
+                                        ch?.measurement_template === "custom" &&
+                                        !data.contents.some(
+                                          (c) =>
+                                            c.channel_id === ch.id &&
+                                            !c.deleted_at,
+                                        )
+                                      ? "channel"
+                                      : ch?.measurement_template ===
+                                            "paid_ad" ||
+                                          ch?.measurement_template ===
+                                            "search_ad"
+                                        ? "paid"
+                                        : "total",
+                                key_prefix: keyword
+                                  ? "keywordRank"
+                                  : profile
+                                    ? "bizProfile"
+                                    : "",
                                 sort_order:
                                   Math.max(
                                     0,
@@ -1029,29 +1110,22 @@ export function OperatingSheet({
                               : "선택 지표의 월간 집계"
                           }
                         >
-                          {number(
-                            rollupValue(
-                              data,
-                              children,
-                              r.rollup,
-                              selected,
-                              period,
-                            ),
-                            rollupUnit,
-                          )}
+                          {showRollup(period, true)}
                         </span>
                       </div>
                     )}
                     {row &&
-                      number(
-                        aggregate?.value,
-                        row.metric?.unit === "percent"
-                          ? "%"
-                          : row.kind === "cost" ||
-                              row.metric?.unit === "currency"
-                            ? "원"
-                            : "",
-                      )}
+                      (row.metric?.unit === "rank"
+                        ? rankSummary(data, row, period)
+                        : number(
+                            aggregate?.value,
+                            row.metric?.unit === "percent"
+                              ? "%"
+                              : row.kind === "cost" ||
+                                  row.metric?.unit === "currency"
+                                ? "원"
+                                : "",
+                          ))}
                   </td>
                   {ds.map((date, di) => (
                     <td
@@ -1071,13 +1145,7 @@ export function OperatingSheet({
                               : undefined
                           }
                         >
-                          {number(
-                            rollupValue(data, children, r.rollup, selected, {
-                              start: date,
-                              end: date,
-                            }),
-                            rollupUnit,
-                          )}
+                          {showRollup({ start: date, end: date })}
                         </span>
                       )}
                       {row &&
@@ -1092,6 +1160,7 @@ export function OperatingSheet({
                           </span>
                         ) : (
                           <EditableCell
+                            rank={row.metric?.unit === "rank"}
                             cellId={`${ri}:${di}`}
                             label={`${row.content_id ? data.contents.find((c) => c.id === row.content_id)?.title + " · " : ""}${row.promotion_id ? data.promotions.find((p) => p.id === row.promotion_id)?.title + " · " : ""}${r.label} ${date}`}
                             value={
@@ -1113,7 +1182,8 @@ export function OperatingSheet({
       </div>
       <div className="sheet-help">
         Enter ↓ · Shift+Enter ↑ · Tab → · Excel 범위 붙여넣기 · 빈칸은 미입력,
-        0은 실제 0 · 누적값은 마지막 관측 기준
+        0은 실제 0 · 순위는 1부터, 노출되지 않으면 ‘미노출’ 입력 · 누적값은
+        마지막 관측 기준
       </div>
     </section>
   );

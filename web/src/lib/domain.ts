@@ -11,6 +11,7 @@ export type Channel = Base & {
   is_active: boolean;
 };
 export type Content = Base & {
+  keyword_metric_ids?: string[] | null;
   channel_id: string | null;
   title: string;
   status: string;
@@ -22,12 +23,19 @@ export type Content = Base & {
 };
 export const isBusinessProfile = (content: Content) =>
   content.content_type === "business_profile";
+export const isSearchKeyword = (content: Content) =>
+  content.content_type === "search_keyword";
 export const metricsForContent = (metrics: Metric[], content: Content) =>
   metrics.filter(
     (m) =>
       !m.deleted_at &&
       m.scope !== "channel" &&
       m.channel_id === content.channel_id &&
+      (isSearchKeyword(content)
+        ? m.unit === "rank" &&
+          (!content.keyword_metric_ids ||
+            content.keyword_metric_ids.includes(m.id))
+        : m.unit !== "rank") &&
       (isBusinessProfile(content)
         ? m.key.startsWith("bizProfile")
         : !m.key.startsWith("bizProfile")),
@@ -67,7 +75,7 @@ export type Metric = Base & {
   key: string;
   name: string;
   scope: "funnel" | "channel" | "total" | "organic" | "paid";
-  unit: "count" | "currency" | "percent";
+  unit: "count" | "currency" | "percent" | "rank";
   mode: "daily" | "cumulative" | "latest" | "ratio";
   numerator: string | null;
   denominator: string | null;
@@ -219,6 +227,7 @@ export type Report = {
     enrollments: number | null;
   }[];
   metrics: {
+    unit?: Metric["unit"];
     channel: string;
     content: string;
     promotion: string;

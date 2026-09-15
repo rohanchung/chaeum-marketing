@@ -1,3 +1,4 @@
+import { rankText } from "./keyword-ranks";
 import * as XLSX from "xlsx";
 import { Report, money, number, percent } from "./domain";
 export function summaryRows(r: Report) {
@@ -116,7 +117,7 @@ export function downloadExcelReport(r: Report) {
       m.metric,
       m.scope,
       m.aggregation,
-      m.value,
+      m.unit === "rank" ? rankText(m.value) : m.value,
       m.observedOn,
     ]),
   ]);
@@ -170,7 +171,7 @@ export function printableHTML(r: Report) {
       m.metric,
       m.scope,
       m.aggregation,
-      number(m.value),
+      m.unit === "rank" ? rankText(m.value) : number(m.value),
       m.observedOn,
     ]),
   )}<h2>계산 기준</h2>${r.notes.map((n) => `<p>${esc(n)}</p>`).join("")}</body></html>`;

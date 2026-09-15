@@ -79,6 +79,11 @@ export function rollupValue(
   );
   if (!metric) return null;
   const sources = rows.filter((r) => r.metric?.id === metric.id);
+  // Positions across different keywords must never be added together.
+  if (metric.unit === "rank")
+    return sources.length === 1
+      ? metricValue(data, sources[0], period).value
+      : null;
   const sum = (values: (number | null)[]) =>
     values.every((v) => v === null)
       ? null

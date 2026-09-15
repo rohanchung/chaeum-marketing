@@ -1,0 +1,27 @@
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','852e21eb-5d5c-49de-b69e-071c66f5d39a',true);
+do $$ declare ws uuid:='bef296c2-53ff-4865-8222-95bec0098350'; m public.mkt_metrics; cid uuid; blocked boolean;
+begin
+ select * into strict m from public.mkt_metrics where workspace_id=ws and key='keywordRankMobilePlace' limit 1;
+ insert into public.contents(workspace_id,channel_id,title,content_type,status) values(ws,m.channel_id,'__rank_test__','search_keyword','published') returning id into cid;
+ perform public.mkt_save_cells(ws,jsonb_build_array(jsonb_build_object('kind','metric','metric_id',m.id,'content_id',cid,'date','2026-09-15','value',3)));
+ if (select value from public.mkt_values where content_id=cid and metric_id=m.id)<>3 then raise exception 'rank save failed'; end if;
+ perform public.mkt_save_cells(ws,jsonb_build_array(jsonb_build_object('kind','metric','metric_id',m.id,'content_id',cid,'date','2026-09-15','value',0)));
+ if (select value from public.mkt_values where content_id=cid and metric_id=m.id)<>0 then raise exception 'not seen save failed'; end if;
+ blocked:=false;
+ begin perform public.mkt_save_cells(ws,jsonb_build_array(jsonb_build_object('kind','metric','metric_id',m.id,'content_id',cid,'date','2026-09-15','value',1.5)));
+ exception when raise_exception then blocked:=true; end;
+ if not blocked then raise exception 'fractional rank accepted'; end if;
+ blocked:=false;
+ begin update public.mkt_metrics set mode='daily' where id=m.id;
+ exception when others then blocked:=true; end;
+ if not blocked then raise exception 'rank sum accepted'; end if;
+ blocked:=false;
+ begin update public.contents set content_type='blog' where id=cid;
+ exception when raise_exception then blocked:=true; end;
+ if not blocked then raise exception 'keyword converted with observations'; end if;
+ perform public.mkt_save_cells(ws,jsonb_build_array(jsonb_build_object('kind','metric','metric_id',m.id,'content_id',cid,'date','2026-09-15','value',null)));
+ if exists(select 1 from public.mkt_values where content_id=cid and value is not null) then raise exception 'clear failed'; end if;
+end $$;
+rollback;

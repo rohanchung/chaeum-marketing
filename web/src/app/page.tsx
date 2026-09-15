@@ -1,4 +1,6 @@
 "use client";
+import { rankText } from "@/lib/keyword-ranks";
+
 import {
   FormEvent,
   ReactNode,
@@ -1382,6 +1384,17 @@ export default function Home() {
                             await exportBackup(workspace),
                             `로한마케팅_복원직전_${Date.now()}.json`,
                           );
+                          if (Array.isArray(backup.tables.contents)) {
+                            backup.tables.contents = backup.tables.contents.map(
+                              (c: Record<string, unknown>) => ({
+                                keyword_metric_ids:
+                                  stateRef.current.contents.find(
+                                    (current) => current.id === c.id,
+                                  )?.keyword_metric_ids ?? null,
+                                ...c,
+                              }),
+                            );
+                          }
                           if (Array.isArray(backup.tables.channels)) {
                             backup.tables.channels = backup.tables.channels.map(
                               (ch: Record<string, unknown>) => ({
@@ -1566,7 +1579,7 @@ export default function Home() {
                     .map((m) => [
                       `${m.promotion || m.scope} · ${m.metric}`,
                       m.aggregation,
-                      number(m.value),
+                      m.unit === "rank" ? rankText(m.value) : number(m.value),
                     ])}
                 />
                 <button
