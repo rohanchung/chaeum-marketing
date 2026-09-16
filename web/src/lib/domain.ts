@@ -247,9 +247,9 @@ export const scopeLabels = {
   paid: "광고 성과",
 };
 export const modeLabels = {
-  daily: "기간 합계",
-  cumulative: "마지막 누적",
-  latest: "마지막 관측",
+  daily: "기간 합계 · 일별 신규 수 합산",
+  cumulative: "누적 총수 · 마지막 값",
+  latest: "최근 관측값",
   ratio: "원시값 재계산",
 };
 export const categories: Record<string, string> = {
@@ -361,7 +361,7 @@ export function metricTemplate(template: string): Seed[] {
     add(k, n, "paid");
   if (template === "paid_ad") {
     add("bizProfileVisits", "방문수", "total");
-    add("bizProfileRegulars", "단골수", "total", "latest");
+    add("bizProfileRegulars", "단골수", "total");
     add("bizProfileCoupons", "쿠폰 발급수", "total");
   }
   add("ctr", "클릭률", "paid", "ratio", "percent", "clicks", "impressions");

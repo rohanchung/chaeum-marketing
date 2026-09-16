@@ -76,7 +76,8 @@ export function metricValue(
                 m.scope === metric.scope &&
                 m.key === key &&
                 !m.deleted_at &&
-                m.mode === "daily",
+                m.mode !== "ratio" &&
+                m.unit !== "rank",
             );
             return m
               ? metricValue(d, { ...row, metric: m }, p, depth + 1).value

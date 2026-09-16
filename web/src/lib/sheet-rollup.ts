@@ -104,7 +104,8 @@ export function rollupValue(
         m.channel_id === metric.channel_id &&
         m.scope === metric.scope &&
         m.key === key &&
-        m.mode === "daily",
+        m.mode !== "ratio" &&
+        m.unit !== "rank",
     );
     return raw
       ? sum(

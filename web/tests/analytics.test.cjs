@@ -19,6 +19,66 @@ const {
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+test("집계 방식 변경은 원본을 보존하며 요약·보고서·파생 비율을 다시 계산한다", () => {
+  const d = fixture();
+  observation(d, "clicks", 1, "2026-09-08", "paid");
+  observation(d, "clicks", 2, "2026-09-11", "paid");
+  observation(d, "clicks", 1, "2026-09-15", "paid");
+  observation(d, "impressions", 100, "2026-09-15", "paid");
+  const clicks = d.metrics.find(
+    (m) => m.key === "clicks" && m.scope === "paid",
+  );
+  const raw = JSON.stringify(d.values);
+  const { rollupValue } = require("../src/lib/sheet-rollup.ts");
+  const rr = row(d, "clicks", "paid"),
+    ctr = row(d, "ctr", "paid");
+  clicks.mode = "latest";
+  assert.equal(metricValue(d, rr, period).value, 1);
+  assert.equal(metricValue(d, ctr, period).value, 1);
+  assert.equal(
+    rollupValue(
+      d,
+      [ctr],
+      { contentId: rr.content_id },
+      "metric:" + ctr.metric.id,
+      period,
+    ),
+    1,
+  );
+  clicks.mode = "daily";
+  assert.equal(metricValue(d, rr, period).value, 4);
+  assert.equal(metricValue(d, ctr, period).value, 4);
+  assert.equal(
+    rollupValue(
+      d,
+      [rr],
+      { contentId: rr.content_id },
+      "metric:" + clicks.id,
+      period,
+    ),
+    4,
+  );
+  assert.equal(
+    rollupValue(
+      d,
+      [ctr],
+      { contentId: rr.content_id },
+      "metric:" + ctr.metric.id,
+      period,
+    ),
+    4,
+  );
+  const saved = structuredClone(report(d, period));
+  clicks.mode = "cumulative";
+  assert.equal(metricValue(d, rr, period).value, 1);
+  assert.equal(metricValue(d, ctr, period).value, 1);
+  assert.equal(JSON.stringify(d.values), raw);
+  assert.equal(saved.metrics.find((m) => m.metric === clicks.name).value, 4);
+  assert.equal(
+    report(d, period).metrics.find((m) => m.metric === clicks.name).value,
+    1,
+  );
+});
 const {
   parseRank,
   rankText,
@@ -936,7 +996,7 @@ test("Business profile metrics stay separate from ads in the sheet and reports",
   ];
   const r = report(d, period);
   const pm = r.metrics.filter((m) => m.content === "비즈프로필");
-  assert.equal(pm.find((m) => m.metric === "단골수").value, 10);
+  assert.equal(pm.find((m) => m.metric === "단골수").value, 22);
   assert.equal(pm.find((m) => m.metric === "방문수").value, 17);
   assert.equal(pm.length, 3);
   assert.ok(

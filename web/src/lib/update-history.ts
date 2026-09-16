@@ -9,6 +9,18 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260916-aggregation",
+    date: "2026-09-16",
+    title: "기록이 있는 지표의 집계 방식 수정",
+    room: "제1차 제작방",
+    changes: [
+      "입력 기록이 있어도 기간 합계·누적 총수·최근값 집계 방식을 변경할 수 있게 했습니다. 기존 숫자는 보존합니다.",
+      "당근 단골수를 일별 신규 단골 합산으로 변경했습니다. 일별 신규 수와 전체 총수의 입력 안내를 구분했습니다.",
+      "시트, 대표 지표 요약, 현재 보고서와 연결된 비율은 변경한 집계 방식으로 다시 계산합니다. 저장한 보고서는 당시 값을 보존합니다.",
+      "기존 기록과 호환되지 않는 연결 대상·단위 변경은 옵션에서 잠금 상태를 명확히 표시합니다.",
+    ],
+  },
+  {
     id: "20260915-handoff-log",
     date: "2026-09-15",
     title: "업데이트 로그와 제1차 제작방 인계",

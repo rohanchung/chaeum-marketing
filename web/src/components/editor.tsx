@@ -110,6 +110,8 @@ export function Editor({
 }) {
   const { collection, record: r = {} } = state;
   const keyword = r.content_type === "search_keyword";
+  const hasMetricValues =
+    collection === "metrics" && data.values.some((v) => v.metric_id === r.id);
   const rankMetric = r.unit === "rank" || r.key_prefix === "keywordRank";
   const [keywordMetrics, setKeywordMetrics] = useState<string[] | null>(
     (r.keyword_metric_ids as string[] | null) ?? null,
@@ -165,6 +167,7 @@ export function Editor({
   const channel = (
     <Field label="채널">
       <select
+        disabled={hasMetricValues}
         name="channel_id"
         required
         value={metricChannel}
@@ -278,18 +281,21 @@ export function Editor({
           ...(r.id ? { id: r.id } : {}),
           name: get("name"),
           key: r.key ?? `${r.key_prefix ?? ""}${crypto.randomUUID()}`,
-          channel_id: metricScope === "funnel" ? null : get("channel_id"),
+          channel_id: metricScope === "funnel" ? null : metricChannel,
           scope: rankMetric ? "total" : metricScope,
           mode: rankMetric
             ? "latest"
             : metricScope === "funnel"
               ? "daily"
               : metricMode,
-          unit: rankMetric ? "rank" : get("unit"),
+          unit: rankMetric ? "rank" : metricUnit,
           sort_order: Number(get("sort_order")),
           numerator: metricMode === "ratio" ? nullable("numerator") : null,
           denominator: metricMode === "ratio" ? nullable("denominator") : null,
-          multiplier: Number(get("multiplier") || 100),
+          multiplier:
+            metricMode === "ratio"
+              ? Number(get("multiplier") || 100)
+              : (r.multiplier ?? 100),
           include_in_marketing:
             metricUnit === "currency" &&
             (metricScope === "funnel" || metricMode === "daily") &&
@@ -552,8 +558,9 @@ export function Editor({
                 </fieldset>
               ) : r.content_type === "business_profile" ? (
                 <p className="form-note">
-                  방문수·쿠폰 발급수는 하루 수치, 단골수는 해당 날짜의 총 단골
-                  수를 입력하세요. 월간 단골수는 마지막 기록값입니다.
+                  방문수·쿠폰 발급수·단골수는 기본적으로 그날 새로 발생한 수를
+                  입력합니다. 월간에는 날짜별 값을 더합니다. 지표 옵션에서 집계
+                  방식을 변경할 수 있습니다.
                 </p>
               ) : channelTemplate === "paid_ad" ? (
                 <p className="form-note">
@@ -696,7 +703,7 @@ export function Editor({
               <Field label="지표 이름">{input("name", "text", true)}</Field>
               <Field label="측정 범위">
                 <select
-                  disabled={rankMetric}
+                  disabled={rankMetric || hasMetricValues}
                   value={metricScope}
                   onChange={(e) => setMetricScope(e.target.value)}
                 >
@@ -716,7 +723,11 @@ export function Editor({
                     onChange={(e) => setMetricMode(e.target.value)}
                   >
                     {Object.entries(modeLabels).map(([key, label]) => (
-                      <option key={key} value={key}>
+                      <option
+                        key={key}
+                        value={key}
+                        disabled={hasMetricValues && key === "ratio"}
+                      >
                         {label}
                       </option>
                     ))}
@@ -724,7 +735,7 @@ export function Editor({
                 </Field>
                 <Field label="단위">
                   <select
-                    disabled={rankMetric}
+                    disabled={rankMetric || hasMetricValues}
                     name="unit"
                     value={metricUnit}
                     onChange={(e) => setMetricUnit(e.target.value)}
@@ -776,6 +787,19 @@ export function Editor({
                     </select>
                   </Field>
                 )}
+              <p className="form-note">
+                {metricMode === "daily"
+                  ? "기간 합계: 일별 신규 수를 입력합니다. 1, 2, 1이면 월간 4입니다."
+                  : metricMode === "ratio"
+                    ? "계산식: 분자·분모 지표의 현재 집계 방식에 따라 다시 계산합니다."
+                    : "누적 총수·최근값: 날짜마다 확인한 전체 수를 입력합니다. 1, 2, 1이면 마지막 값 1입니다. 더하지 않습니다."}
+              </p>
+              {r.include_in_marketing && metricMode !== "daily" && (
+                <p className="form-note">
+                  이 지표는 기간 합계 방식에서만 마케팅 비용에 합산됩니다.
+                  변경하면 해당 지표 금액은 비용 합계에서 제외됩니다.
+                </p>
+              )}
               <Field label="표시 순서">
                 {input("sort_order", "number", true, "0")}
               </Field>
@@ -796,7 +820,8 @@ export function Editor({
                             m.channel_id === metricChannel &&
                             !m.deleted_at &&
                             m.scope === metricScope &&
-                            m.mode === "daily",
+                            m.mode !== "ratio" &&
+                            m.unit !== "rank",
                         )
                         .map((m) => (
                           <option key={m.id} value={m.key}>
@@ -819,7 +844,8 @@ export function Editor({
                             m.channel_id === metricChannel &&
                             !m.deleted_at &&
                             m.scope === metricScope &&
-                            m.mode === "daily",
+                            m.mode !== "ratio" &&
+                            m.unit !== "rank",
                         )
                         .map((m) => (
                           <option key={m.id} value={m.key}>
@@ -834,8 +860,11 @@ export function Editor({
                 </>
               )}
               <p className="form-note">
-                이미 수치가 있는 지표는 이름과 순서만 변경할 수 있습니다. 측정
-                의미가 달라지면 새 지표를 만드세요.
+                기록이 있어도 집계 방식을 수정할 수 있습니다. 원본 숫자는
+                유지하며 시트·요약·현재 보고서는 변경한 방식으로 다시
+                계산합니다. 저장된 보고서는 당시 값을 보존합니다.
+                {hasMetricValues &&
+                  " 연결 대상·단위 변경과 계산식 전환은 기존 기록과 호환되지 않아 잠겨 있습니다."}
               </p>
             </>
           )}
