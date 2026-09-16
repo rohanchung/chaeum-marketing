@@ -9,6 +9,16 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260916-content-order",
+    date: "2026-09-16",
+    title: "소재를 등록한 순서대로 정렬",
+    room: "제1차 제작방",
+    changes: [
+      "운영시트와 콘텐츠 목록에서 먼저 등록한 소재부터 표시하고 새 소재는 마지막에 추가합니다.",
+      "발행일을 수정해도 등록 순서는 유지됩니다. 키워드·비즈프로필의 기존 그룹 배치는 유지합니다.",
+    ],
+  },
+  {
     id: "20260916-aggregation",
     date: "2026-09-16",
     title: "기록이 있는 지표의 집계 방식 수정",

@@ -30,6 +30,7 @@ import {
   scopeLabels,
   timestamp,
   isBusinessProfile,
+  compareContentCreated,
 } from "@/lib/domain";
 import { report, sourceName } from "@/lib/analytics";
 import {
@@ -747,6 +748,7 @@ export default function Home() {
                 <div className="content-grid">
                   {data.contents
                     .filter((c) => show(c) && c.title.includes(search))
+                    .sort(compareContentCreated)
                     .map((c) => (
                       <article className="content-card" key={c.id}>
                         <div className="eyebrow">

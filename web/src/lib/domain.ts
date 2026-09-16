@@ -11,6 +11,7 @@ export type Channel = Base & {
   is_active: boolean;
 };
 export type Content = Base & {
+  created_at?: string;
   keyword_metric_ids?: string[] | null;
   channel_id: string | null;
   title: string;
@@ -23,6 +24,13 @@ export type Content = Base & {
 };
 export const isBusinessProfile = (content: Content) =>
   content.content_type === "business_profile";
+export function compareContentCreated(a: Content, b: Content) {
+  const time = (c: Content) => {
+    const value = Date.parse(c.created_at ?? "");
+    return Number.isFinite(value) ? value : Infinity;
+  };
+  return time(a) - time(b) || a.id.localeCompare(b.id);
+}
 export const isSearchKeyword = (content: Content) =>
   content.content_type === "search_keyword";
 export const metricsForContent = (metrics: Metric[], content: Content) =>

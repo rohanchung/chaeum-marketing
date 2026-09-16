@@ -19,6 +19,27 @@ const {
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+test("소재는 발행일이나 ID가 아닌 등록일 과거순이며 같은 시각도 안정적으로 정렬한다", () => {
+  const { compareContentCreated } = require("../src/lib/domain.ts");
+  const contents = [
+    {
+      id: "a-new",
+      created_at: "2026-09-16T00:00:00Z",
+      published_at: "2026-01-01",
+    },
+    {
+      id: "z-old",
+      created_at: "2026-09-08T00:00:00Z",
+      published_at: "2026-12-01",
+    },
+    { id: "b-tie", created_at: "2026-09-09T09:00:00+09:00" },
+    { id: "a-tie", created_at: "2026-09-09T00:00:00Z" },
+  ];
+  assert.deepEqual(
+    contents.sort(compareContentCreated).map((c) => c.id),
+    ["z-old", "a-tie", "b-tie", "a-new"],
+  );
+});
 test("집계 방식 변경은 원본을 보존하며 요약·보고서·파생 비율을 다시 계산한다", () => {
   const d = fixture();
   observation(d, "clicks", 1, "2026-09-08", "paid");

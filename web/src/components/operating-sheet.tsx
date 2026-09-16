@@ -17,6 +17,7 @@ import {
   isBusinessProfile,
   isSearchKeyword,
   metricsForContent,
+  compareContentCreated,
 } from "@/lib/domain";
 import { metricValue } from "@/lib/analytics";
 import { RollupTarget, rollupOptions, rollupValue } from "@/lib/sheet-rollup";
@@ -403,7 +404,8 @@ export function OperatingSheet({
       .sort(
         (a, b) =>
           Number(isSearchKeyword(b)) - Number(isSearchKeyword(a)) ||
-          Number(isBusinessProfile(b)) - Number(isBusinessProfile(a)),
+          Number(isBusinessProfile(b)) - Number(isBusinessProfile(a)) ||
+          compareContentCreated(a, b),
       );
     contents.forEach((c) => {
       if (isSearchKeyword(c)) {
