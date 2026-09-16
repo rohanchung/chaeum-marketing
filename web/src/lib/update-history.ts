@@ -9,6 +9,16 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260916-pretendard",
+    date: "2026-09-16",
+    title: "전체 글꼴을 프리텐다드로 통일",
+    room: "제1차 제작방",
+    changes: [
+      "메뉴, 운영시트, 입력창, 로그와 인쇄 보고서에 프리텐다드를 적용했습니다.",
+      "굵은 글씨는 프리텐다드의 실제 700 굵기를 사용하고 기존 글자 크기와 간격을 유지했습니다.",
+    ],
+  },
+  {
     id: "20260916-content-order",
     date: "2026-09-16",
     title: "소재를 등록한 순서대로 정렬",
