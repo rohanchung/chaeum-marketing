@@ -2681,3 +2681,60 @@ textarea {
     display: none;
   }
 }
+
+/* Calendar-first task workspace: the calendar is the main view and the task tree stays beside it. */
+.work-overview-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
+  grid-template-areas: "calendar list";
+  align-items: start;
+}
+.task-calendar {
+  grid-area: calendar;
+  min-width: 0;
+}
+.task-tree {
+  grid-area: list;
+  align-self: start;
+  max-height: 620px;
+  overflow: auto;
+}
+.calendar-main .section-toolbar small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.calendar-task {
+  display: block;
+  width: 100%;
+  margin-top: 3px;
+  overflow: hidden;
+  padding: 2px 3px;
+  border: 0;
+  border-left: 2px solid #5d9a70;
+  border-radius: 2px;
+  background: #eaf4ed;
+  color: #3a6f4e;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+}
+.calendar-task.continues {
+  border-left-color: #a7c8ae;
+  background: #f2f8f2;
+  color: #63816b;
+}
+.calendar-more {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 9px;
+}
+@media (max-width: 900px) {
+  .work-overview-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "calendar" "list";
+  }
+  .task-tree {
+    max-height: none;
+  }
+}

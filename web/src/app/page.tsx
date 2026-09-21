@@ -60,11 +60,7 @@ import { eventCost, unitCost, usedQuantity } from "@/lib/purchases";
 import { UpdateLog } from "@/components/update-log";
 import { useNavigation } from "@/components/use-navigation";
 import {
-  ProjectActivitySummary,
-  TaskForm,
   TaskWorkspace,
-  TodayActivity,
-  materializedTasks,
 } from "@/components/task-workspace";
 import { nextTaskOccurrence } from "@/lib/task-recurrence";
 
@@ -83,13 +79,11 @@ export default function Home() {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const [eventDate, setEventDate] = useState<string | null>(null);
-  const [dayTaskDate, setDayTaskDate] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(0);
   const [ready, setReady] = useState(false);
   const [analysisTab, setAnalysisTab] = useState("성과");
-  const [taskProjectId, setTaskProjectId] = useState("");
   const [lifecycle, setLifecycle] = useState("active");
   const [search, setSearch] = useState("");
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
@@ -103,7 +97,6 @@ export default function Home() {
       setEditor(null);
       setDetail(null);
       setEventDate(null);
-      setDayTaskDate(null);
       setSelectedReport(null);
     };
     window.addEventListener("popstate", closeOverlays);
@@ -670,32 +663,9 @@ export default function Home() {
           <>
             {nav === "대시보드" && (
               <>
-                <TodayActivity
-                  data={data}
-                  today={today}
-                  onOpen={() => {
-                    setTaskProjectId("");
-                    setNav("업무");
-                  }}
-                  onToggle={(task) =>
-                    task.recurrence_template_id && task.occurrence_on
-                      ? void completeRecurringTask(task, task.status !== "done").catch(() => {})
-                      : changeState("tasks", task.id, {
-                          status: task.status === "done" ? "planned" : "done",
-                          completed_at:
-                            task.status === "done" ? null : new Date().toISOString(),
-                        })
-                  }
-                  onCompleteRecurring={completeRecurringTask}
-                  onAdd={() => {
-                    setTaskProjectId("");
-                    setNav("업무");
-                  }}
-                />
                 <Kpis report={currentReport} compact />
                 <OperatingSheet
                   data={data}
-                  tasks={materializedTasks(data, today)}
                   period={period}
                   today={today}
                   clockSynced={clockSynced}
@@ -768,21 +738,12 @@ export default function Home() {
                     </div>
                   }
                 />
-                <ProjectActivitySummary
-                  data={data}
-                  today={today}
-                  onOpen={(projectId) => {
-                    setTaskProjectId(projectId);
-                    setNav("업무");
-                  }}
-                />
               </>
             )}
             {nav === "업무" && (
               <TaskWorkspace
                 data={data}
                 today={today}
-                initialProjectId={taskProjectId}
                 onSave={(collection, record) => mutate(collection, record)}
                 onUpdate={(collection, id, patch) => changeState(collection, id, patch)}
                 onCompleteRecurring={completeRecurringTask}
@@ -1587,53 +1548,6 @@ export default function Home() {
             </header>
             <section className="day-activity-block">
               <div className="section-toolbar">
-                <h3>업무</h3>
-                <button onClick={() => setDayTaskDate(eventDate)}>＋ 업무</button>
-              </div>
-              {materializedTasks(data, today)
-                .filter(
-                  (task) =>
-                    !task.deleted_at &&
-                    (datePart(task.due_at) === eventDate ||
-                      datePart(task.start_at) === eventDate),
-                )
-                .map((task) => (
-                  <div key={task.id} className="event-day-item">
-                    <label className="day-task-item">
-                      <input
-                        type="checkbox"
-                        checked={task.status === "done"}
-                        onChange={() =>
-                          task.recurrence_template_id && task.occurrence_on
-                            ? void completeRecurringTask(task, task.status !== "done").catch(() => {})
-                            : changeState("tasks", task.id, {
-                                status: task.status === "done" ? "planned" : "done",
-                                completed_at:
-                                  task.status === "done"
-                                    ? null
-                                    : new Date().toISOString(),
-                              })
-                        }
-                      />
-                      <span>
-                        <strong>{task.title}</strong>
-                        <small>
-                          {data.workProjects.find((p) => p.id === task.project_id)
-                            ?.name ?? "미분류 업무"}
-                        </small>
-                      </span>
-                    </label>
-                  </div>
-                ))}
-              {!materializedTasks(data, today).some(
-                (task) =>
-                  !task.deleted_at &&
-                  (datePart(task.due_at) === eventDate ||
-                    datePart(task.start_at) === eventDate),
-              ) && <p className="day-activity-empty">등록된 업무가 없습니다.</p>}
-            </section>
-            <section className="day-activity-block">
-              <div className="section-toolbar">
                 <h3>이벤트</h3>
                 <button
                   className="primary"
@@ -1668,17 +1582,6 @@ export default function Home() {
             </section>
           </section>
         </div>
-      )}
-      {dayTaskDate && (
-        <TaskForm
-          data={data}
-          today={today}
-          task={null}
-          initialDate={dayTaskDate}
-          onSave={(collection, record) => mutate(collection, record)}
-          onArchive={() => undefined}
-          onClose={() => setDayTaskDate(null)}
-        />
       )}
       {detail &&
         (() => {

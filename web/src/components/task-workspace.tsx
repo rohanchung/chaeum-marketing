@@ -786,7 +786,6 @@ export function TaskWorkspace({
       return aDone - bDone || aDue.localeCompare(bDue) || a.sort_order - b.sort_order;
     });
   }, [materialized, filter, projectId, today]);
-  const timelineTasks = filter === "all" ? materialized : visibleTasks;
   const toggle = (task: Task) => {
     if (task.recurrence_template_id && task.occurrence_on && onCompleteRecurring) {
       void Promise.resolve(onCompleteRecurring(task, task.status !== "done")).catch(() => {});
@@ -800,9 +799,17 @@ export function TaskWorkspace({
   const currentProject = projects.find((project) => project.id === projectId) ?? null;
   const calendarDays = dates(monthPeriod(today.slice(0, 7)));
   const calendarTasks = new Map<string, Task[]>();
-  for (const task of materialized) {
-    const day = dateOnly(task.due_at ?? task.start_at);
-    if (day) calendarTasks.set(day, [...(calendarTasks.get(day) ?? []), task]);
+  for (const task of visibleTasks) {
+    const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
+    const due = dateOnly(task.due_at) ?? start;
+    if (!start || !due) continue;
+    const rangeStart = start <= due ? start : due;
+    const rangeEnd = start <= due ? due : start;
+    for (const day of calendarDays) {
+      if (day >= rangeStart && day <= rangeEnd) {
+        calendarTasks.set(day, [...(calendarTasks.get(day) ?? []), task]);
+      }
+    }
   }
   return (
     <div className="work-page">
@@ -895,6 +902,7 @@ export function TaskWorkspace({
                       </button>
                       <div className="project-tree-actions">
                         <button aria-label={`${project.name} 업무 추가`} onClick={() => { setNewTaskProjectId(project.id); setTaskEditor(null); }}>＋ 업무</button>
+                        <button aria-label={`${project.name} 업무만 보기`} onClick={() => { setProjectId(project.id); setFilter("projects"); }}>보기</button>
                         <button aria-label={`${project.name} 수정`} onClick={() => setProjectEditor(project)}>⋯</button>
                       </div>
                     </div>
@@ -927,38 +935,21 @@ export function TaskWorkspace({
               })()}
               {!projects.length && !visibleTasks.length && <div className="empty-small">프로젝트 또는 업무를 추가해 보세요.</div>}
             </section>
-            <section className="task-timeline panel">
-              <div className="section-toolbar"><h2>프로젝트 타임라인</h2><small>{today} 기준</small></div>
-              {projects.length ? projects.map((project) => {
-                const tasks = timelineTasks.filter((task) => task.project_id === project.id);
-                const allProjectTasks = materialized.filter((task) => task.project_id === project.id);
-                const done = allProjectTasks.filter((task) => task.status === "done").length;
-                return (
-                  <div className="timeline-project" key={project.id}>
-                    <button className="timeline-project-head" onClick={() => { setProjectId(project.id); setFilter("projects"); }}>
-                      <span><strong>{project.name}</strong><small>{project.start_on ?? "시작일 미정"} → {project.due_on ?? "목표일 미정"}</small></span>
-                      <i><b style={{ width: `${Math.max(12, Math.min(100, allProjectTasks.length ? (done / allProjectTasks.length) * 100 : 0))}%` }} /></i>
-                      <em>{done}/{allProjectTasks.length}</em>
-                    </button>
-                    {tasks.slice(0, 8).map((task) => (
-                      <button className="timeline-task" key={task.id} onClick={() => setTaskEditor(task)}>
-                        <span>{task.status === "done" ? "✓" : "○"} {task.title}</span>
-                        <small>{compactDate(task.start_at)} → {compactDate(task.due_at)}</small>
-                      </button>
-                    ))}
-                    {tasks.length > 8 && <small className="timeline-more">+ {tasks.length - 8}건</small>}
-                  </div>
-                );
-              }) : <div className="empty-small">프로젝트를 추가해 보세요.</div>}
-            </section>
           </div>
-          <section className="task-calendar panel">
-            <div className="section-toolbar"><h2>{today.slice(0, 7).replace("-", "년 ")}월 업무 캘린더</h2><small>오늘 {today.slice(5).replace("-", "/")}</small></div>
+          <section className="task-calendar calendar-main panel">
+            <div className="section-toolbar"><h2>{today.slice(0, 7).replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 사이 업무 흐름 포함 · 오늘 {today.slice(5).replace("-", "/")}</small></div>
             <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
             <div className="calendar-grid">
               {calendarDays.map((day) => <div className={day === today ? "calendar-day today" : "calendar-day"} key={day}>
                 <b>{Number(day.slice(-2))}</b>
-                {(calendarTasks.get(day) ?? []).slice(0, 3).map((task) => <button key={task.id} onClick={() => setTaskEditor(task)}>{task.title}</button>)}
+                {(calendarTasks.get(day) ?? []).slice(0, 4).map((task) => {
+                  const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
+                  const continues = start !== day;
+                  return <button className={`calendar-task${continues ? " continues" : ""}`} key={`${task.id}:${day}`} onClick={() => setTaskEditor(task)}>
+                    {continues ? `↳ ${task.title}` : task.title}
+                  </button>;
+                })}
+                {(calendarTasks.get(day) ?? []).length > 4 && <small className="calendar-more">+ {(calendarTasks.get(day) ?? []).length - 4}건</small>}
               </div>)}
             </div>
           </section>

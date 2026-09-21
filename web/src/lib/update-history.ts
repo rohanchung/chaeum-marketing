@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260921-task-calendar-first",
+    date: "2026-09-21",
+    title: "대시보드 업무 분리와 캘린더 중심 업무 화면",
+    room: "현재 제작방",
+    changes: [
+      "대시보드에서 업무 활동·프로젝트 요약·업무 추가 진입점을 제거하고 KPI·운영시트 중심으로 되돌렸습니다.",
+      "업무 페이지는 캘린더를 메인으로 두고 오른쪽에 프로젝트 하위 업무 목록을 배치했습니다.",
+      "별도 타임라인 패널을 없애고 실행 예정일부터 마감일까지 업무가 캘린더 날짜 칸에 연속 표시되도록 통합했습니다.",
+    ],
+  },
+  {
     id: "20260921-task-workspace-hierarchy",
     date: "2026-09-21",
     title: "업무 페이지 계층·통합 보기",
