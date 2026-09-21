@@ -1014,6 +1014,47 @@ a:hover {
   max-height: 80vh;
   overflow: auto;
 }
+.day-activity-block {
+  margin: 10px 0 14px;
+  padding-top: 4px;
+  border-top: 1px solid #edf1ed;
+}
+.day-activity-block h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.day-activity-block .section-toolbar {
+  margin: 0 0 3px;
+}
+.day-activity-block .section-toolbar button {
+  font-size: 11px;
+}
+.day-task-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.day-task-item > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.day-task-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 550;
+}
+.day-task-item small {
+  font-size: 10px;
+}
+.day-activity-empty {
+  padding: 4px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
 .event-day-item {
   display: flex;
   align-items: center;
@@ -2131,6 +2172,25 @@ textarea {
 }
 .task-editor textarea {
   resize: vertical;
+}
+.recurrence-box {
+  margin: 2px 0 9px;
+  padding: 8px 9px 2px;
+  border: 1px solid #dfeadf;
+  border-radius: 6px;
+  background: #f8fbf7;
+}
+.recurrence-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 11px;
+}
+.recurrence-heading small {
+  color: var(--muted);
+  font-size: 10px;
 }
 .timeline-project {
   display: grid;

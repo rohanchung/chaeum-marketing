@@ -17,6 +17,7 @@ import {
   Report,
   Promotion,
   Source,
+  Task,
   categories,
   datePart,
   emptyData,
@@ -60,9 +61,12 @@ import { UpdateLog } from "@/components/update-log";
 import { useNavigation } from "@/components/use-navigation";
 import {
   ProjectActivitySummary,
+  TaskForm,
   TaskWorkspace,
   TodayActivity,
+  materializedTasks,
 } from "@/components/task-workspace";
+import { nextTaskOccurrence } from "@/lib/task-recurrence";
 
 const tabs = ["대시보드", "업무", "콘텐츠", "이벤트", "구매", "분석", "리포트", "로그"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
@@ -79,6 +83,7 @@ export default function Home() {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const [eventDate, setEventDate] = useState<string | null>(null);
+  const [dayTaskDate, setDayTaskDate] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(0);
@@ -98,6 +103,7 @@ export default function Home() {
       setEditor(null);
       setDetail(null);
       setEventDate(null);
+      setDayTaskDate(null);
       setSelectedReport(null);
     };
     window.addEventListener("popstate", closeOverlays);
@@ -321,6 +327,37 @@ export default function Home() {
       .finally(() => setBusy((b) => b - 1));
   }
   const edit = (state: EditorState) => setEditor(state);
+  async function completeRecurringTask(task: Task, completed: boolean) {
+    const templateId = task.recurrence_template_id ?? task.id;
+    const occurrenceOn = task.occurrence_on;
+    if (!workspace || !occurrenceOn) return;
+    await run(async () => {
+      const { error: occurrenceError } = await supabase
+        .from("mkt_task_occurrences")
+        .upsert(
+          {
+            workspace_id: workspace,
+            task_id: templateId,
+            occurrence_on: occurrenceOn,
+            status: completed ? "done" : "planned",
+            completed_at: completed ? new Date().toISOString() : null,
+          },
+          { onConflict: "workspace_id,task_id,occurrence_on" },
+        );
+      if (occurrenceError) throw occurrenceError;
+      const base = stateRef.current.tasks.find((item) => item.id === templateId);
+      if (!base) throw new Error("반복 업무 원본을 찾지 못했습니다.");
+      const next = completed ? nextTaskOccurrence(base, occurrenceOn) : occurrenceOn;
+      await updateRecord(workspace, "tasks", templateId, {
+        recurrence_next_on: next,
+        recurrence_active: next !== null,
+        status: next === null ? "done" : "planned",
+        completed_at: next === null ? new Date().toISOString() : null,
+      });
+      await refresh(workspace);
+      setNotice(completed ? "반복 업무를 완료하고 다음 일정을 만들었습니다." : "반복 업무를 되돌렸습니다.");
+    });
+  }
   const changeState = (
     collection: Collection,
     id: string,
@@ -636,12 +673,15 @@ export default function Home() {
                     setNav("업무");
                   }}
                   onToggle={(task) =>
-                    changeState("tasks", task.id, {
-                      status: task.status === "done" ? "planned" : "done",
-                      completed_at:
-                        task.status === "done" ? null : new Date().toISOString(),
-                    })
+                    task.recurrence_template_id && task.occurrence_on
+                      ? void completeRecurringTask(task, task.status !== "done").catch(() => {})
+                      : changeState("tasks", task.id, {
+                          status: task.status === "done" ? "planned" : "done",
+                          completed_at:
+                            task.status === "done" ? null : new Date().toISOString(),
+                        })
                   }
+                  onCompleteRecurring={completeRecurringTask}
                   onAdd={() => {
                     setTaskProjectId("");
                     setNav("업무");
@@ -650,7 +690,7 @@ export default function Home() {
                 <Kpis report={currentReport} compact />
                 <OperatingSheet
                   data={data}
-                  tasks={data.tasks}
+                  tasks={materializedTasks(data, today)}
                   period={period}
                   today={today}
                   clockSynced={clockSynced}
@@ -687,16 +727,7 @@ export default function Home() {
                       await refresh(workspace);
                     })
                   }
-                  onDate={(date) =>
-                    data.events.some(
-                      (e) => !e.deleted_at && datePart(e.starts_at) === date,
-                    )
-                      ? setEventDate(date)
-                      : edit({
-                          collection: "events",
-                          record: { starts_at: timestamp(date) },
-                        })
-                  }
+                  onDate={(date) => setEventDate(date)}
                   onDetail={setDetail}
                   actions={
                     <div className="inline-tools">
@@ -749,6 +780,7 @@ export default function Home() {
                 initialProjectId={taskProjectId}
                 onSave={(collection, record) => mutate(collection, record)}
                 onUpdate={(collection, id, patch) => changeState(collection, id, patch)}
+                onCompleteRecurring={completeRecurringTask}
                 onDelete={(collection, id) =>
                   fire(async () => {
                     await deleteRecord(workspace, collection, id);
@@ -1501,6 +1533,7 @@ export default function Home() {
                             "mkt_work_projects",
                             "mkt_tasks",
                             "mkt_work_links",
+                            "mkt_task_occurrences",
                           ] as const) {
                             const rows = backup.tables[table];
                             if (!Array.isArray(rows) || rows.length === 0) continue;
@@ -1539,7 +1572,7 @@ export default function Home() {
             aria-labelledby="event-day-title"
           >
             <header className="panel-heading">
-              <h2 id="event-day-title">{eventDate} 이벤트</h2>
+              <h2 id="event-day-title">{eventDate} 활동</h2>
               <button
                 aria-label="이벤트 닫기"
                 onClick={() => setEventDate(null)}
@@ -1547,36 +1580,100 @@ export default function Home() {
                 ✕
               </button>
             </header>
-            {data.events
-              .filter(
+            <section className="day-activity-block">
+              <div className="section-toolbar">
+                <h3>업무</h3>
+                <button onClick={() => setDayTaskDate(eventDate)}>＋ 업무</button>
+              </div>
+              {materializedTasks(data, today)
+                .filter(
+                  (task) =>
+                    !task.deleted_at &&
+                    (datePart(task.due_at) === eventDate ||
+                      datePart(task.start_at) === eventDate),
+                )
+                .map((task) => (
+                  <div key={task.id} className="event-day-item">
+                    <label className="day-task-item">
+                      <input
+                        type="checkbox"
+                        checked={task.status === "done"}
+                        onChange={() =>
+                          task.recurrence_template_id && task.occurrence_on
+                            ? void completeRecurringTask(task, task.status !== "done").catch(() => {})
+                            : changeState("tasks", task.id, {
+                                status: task.status === "done" ? "planned" : "done",
+                                completed_at:
+                                  task.status === "done"
+                                    ? null
+                                    : new Date().toISOString(),
+                              })
+                        }
+                      />
+                      <span>
+                        <strong>{task.title}</strong>
+                        <small>
+                          {data.workProjects.find((p) => p.id === task.project_id)
+                            ?.name ?? "미분류 업무"}
+                        </small>
+                      </span>
+                    </label>
+                  </div>
+                ))}
+              {!materializedTasks(data, today).some(
+                (task) =>
+                  !task.deleted_at &&
+                  (datePart(task.due_at) === eventDate ||
+                    datePart(task.start_at) === eventDate),
+              ) && <p className="day-activity-empty">등록된 업무가 없습니다.</p>}
+            </section>
+            <section className="day-activity-block">
+              <div className="section-toolbar">
+                <h3>이벤트</h3>
+                <button
+                  className="primary"
+                  onClick={() => {
+                    setEventDate(null);
+                    edit({
+                      collection: "events",
+                      record: { starts_at: timestamp(eventDate) },
+                    });
+                  }}
+                >
+                  ＋ 이벤트
+                </button>
+              </div>
+              {data.events
+                .filter(
+                  (e) => !e.deleted_at && datePart(e.starts_at) === eventDate,
+                )
+                .map((e) => (
+                  <div key={e.id} className="event-day-item">
+                    <span>
+                      {e.title}
+                      {e.location ? ` · ${e.location}` : ""} · 원가{" "}
+                      {money(eventCost(data, e.id).total)}
+                    </span>
+                    {lifecycleActions("events", e)}
+                  </div>
+                ))}
+              {!data.events.some(
                 (e) => !e.deleted_at && datePart(e.starts_at) === eventDate,
-              )
-              .map((e) => (
-                <div key={e.id} className="event-day-item">
-                  <span>
-                    {e.title}
-                    {e.location ? ` · ${e.location}` : ""} · 원가{" "}
-                    {money(eventCost(data, e.id).total)}
-                  </span>
-                  {lifecycleActions("events", e)}
-                </div>
-              ))}
-            {!data.events.some(
-              (e) => !e.deleted_at && datePart(e.starts_at) === eventDate,
-            ) && <p>기록된 이벤트가 없습니다.</p>}
-            <button
-              className="primary"
-              onClick={() =>
-                edit({
-                  collection: "events",
-                  record: { starts_at: timestamp(eventDate) },
-                })
-              }
-            >
-              ＋ 이벤트 기록
-            </button>
+              ) && <p className="day-activity-empty">기록된 이벤트가 없습니다.</p>}
+            </section>
           </section>
         </div>
+      )}
+      {dayTaskDate && (
+        <TaskForm
+          data={data}
+          today={today}
+          task={null}
+          initialDate={dayTaskDate}
+          onSave={(collection, record) => mutate(collection, record)}
+          onArchive={() => undefined}
+          onClose={() => setDayTaskDate(null)}
+        />
       )}
       {detail &&
         (() => {

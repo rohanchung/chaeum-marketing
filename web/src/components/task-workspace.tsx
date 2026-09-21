@@ -15,6 +15,7 @@ import {
   timestamp,
 } from "@/lib/domain";
 import { Collection } from "@/lib/repository";
+import { recurrenceText } from "@/lib/task-recurrence";
 
 type Save = (collection: Collection, record: Record<string, unknown>) => Promise<void>;
 type Update = (
@@ -55,10 +56,32 @@ const dateLabel = (value: string | null, today: string) => {
 };
 const activeTask = (task: Task) =>
   !task.deleted_at && task.status !== "done" && task.status !== "cancelled";
-const projectTasks = (data: Data, projectId: string | null) =>
-  data.tasks.filter(
-    (task) => activeTask(task) && (!projectId || task.project_id === projectId),
+
+export function materializedTasks(data: Data, today: string): Task[] {
+  const occurrences = new Map(
+    data.taskOccurrences.map((occurrence) => [
+      `${occurrence.task_id}:${occurrence.occurrence_on}`,
+      occurrence,
+    ]),
   );
+  return data.tasks
+    .filter((task) => !task.deleted_at)
+    .flatMap((task): Task[] => {
+      if (task.source_type !== "recurring" || !task.recurrence_active) return [task];
+      const occurrenceOn = task.recurrence_next_on ?? dateOnly(task.start_at) ?? today;
+      const occurrence = occurrences.get(`${task.id}:${occurrenceOn}`);
+      return [{
+        ...task,
+        id: `${task.id}:${occurrenceOn}`,
+        recurrence_template_id: task.id,
+        occurrence_on: occurrenceOn,
+        start_at: timestamp(occurrenceOn),
+        due_at: dueTimestamp(occurrenceOn),
+        status: (occurrence?.status === "done" ? "done" : "planned") as TaskStatus,
+        completed_at: occurrence?.completed_at ?? null,
+      } as Task];
+    });
+}
 
 export function TodayActivity({
   data,
@@ -66,14 +89,16 @@ export function TodayActivity({
   onOpen,
   onToggle,
   onAdd,
+  onCompleteRecurring,
 }: {
   data: Data;
   today: string;
   onOpen: () => void;
   onToggle: (task: Task) => void;
   onAdd: () => void;
+  onCompleteRecurring?: (task: Task, completed: boolean) => void | Promise<void>;
 }) {
-  const tasks = data.tasks
+  const tasks = materializedTasks(data, today)
     .filter((task) => {
       if (!activeTask(task)) return false;
       const start = dateOnly(task.start_at);
@@ -112,7 +137,12 @@ export function TodayActivity({
               <input
                 type="checkbox"
                 aria-label={`${task.title} 완료`}
-                onChange={() => onToggle(task)}
+                checked={task.status === "done"}
+                onChange={() => {
+                  if (task.recurrence_template_id && onCompleteRecurring) {
+                    void Promise.resolve(onCompleteRecurring(task, task.status !== "done")).catch(() => {});
+                  } else onToggle(task);
+                }}
               />
               <div>
                 <strong>{task.title}</strong>
@@ -155,6 +185,7 @@ export function ProjectActivitySummary({
   const projects = data.workProjects
     .filter((project) => !project.deleted_at && project.status === "active")
     .sort((a, b) => a.sort_order - b.sort_order);
+  const allTasks = materializedTasks(data, today);
   if (!projects.length) return null;
   return (
     <section className="project-summary panel">
@@ -167,15 +198,17 @@ export function ProjectActivitySummary({
       </div>
       <div className="project-summary-grid">
         {projects.map((project) => {
-          const tasks = projectTasks(data, project.id);
+          const tasks = allTasks.filter(
+            (task) => activeTask(task) && task.project_id === project.id,
+          );
           const next = tasks
             .filter((task) => task.due_at)
             .sort((a, b) => (a.due_at ?? "").localeCompare(b.due_at ?? ""))[0];
-          const done = data.tasks.filter(
+          const done = allTasks.filter(
             (task) =>
               !task.deleted_at && task.project_id === project.id && task.status === "done",
           ).length;
-          const total = data.tasks.filter(
+          const total = allTasks.filter(
             (task) => !task.deleted_at && task.project_id === project.id,
           ).length;
           return (
@@ -199,10 +232,11 @@ export function ProjectActivitySummary({
   );
 }
 
-function TaskForm({
+export function TaskForm({
   data,
   today,
   task,
+  initialDate = "",
   onSave,
   onArchive,
   onClose,
@@ -210,6 +244,7 @@ function TaskForm({
   data: Data;
   today: string;
   task: Task | null;
+  initialDate?: string;
   onSave: Save;
   onArchive: (task: Task) => void;
   onClose: () => void;
@@ -221,20 +256,33 @@ function TaskForm({
   const [requester, setRequester] = useState(task?.requester_name ?? "");
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "planned");
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? "normal");
-  const [startOn, setStartOn] = useState(dateOnly(task?.start_at ?? null) ?? "");
-  const [dueOn, setDueOn] = useState(dateOnly(task?.due_at ?? null) ?? "");
+  const [startOn, setStartOn] = useState(dateOnly(task?.start_at ?? null) ?? initialDate);
+  const [dueOn, setDueOn] = useState(dateOnly(task?.due_at ?? null) ?? initialDate);
   const [description, setDescription] = useState(task?.description ?? "");
   const [requestNote, setRequestNote] = useState(task?.request_note ?? "");
   const [result, setResult] = useState(task?.result ?? "");
   const [nextAction, setNextAction] = useState(task?.next_action ?? "");
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<Task["recurrence_frequency"]>(
+    task?.recurrence_frequency ?? "daily",
+  );
+  const [recurrenceInterval, setRecurrenceInterval] = useState(
+    String(task?.recurrence_interval ?? 1),
+  );
+  const [recurrenceUntil, setRecurrenceUntil] = useState(task?.recurrence_until ?? "");
   const projects = data.workProjects.filter((project) => !project.deleted_at);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!title.trim()) return;
     const project = projects.find((item) => item.id === projectId);
+    const recurring = sourceType === "recurring";
+    const normalizedStart = recurring ? startOn || today : startOn;
+    const normalizedDue = recurring ? dueOn || normalizedStart : dueOn;
+    const recurrenceNextOn = recurring
+      ? (task?.recurrence_next_on ?? normalizedStart) || today
+      : null;
     await onSave("tasks", {
-      ...(task ? { id: task.id } : {}),
+      ...(task ? { id: task.recurrence_template_id ?? task.id } : {}),
       area_id: project?.area_id ?? data.workAreas.find((area) => !area.deleted_at)?.id ?? null,
       project_id: projectId || null,
       title: title.trim(),
@@ -247,9 +295,15 @@ function TaskForm({
       request_note: sourceType === "requested" ? requestNote.trim() || null : null,
       status,
       priority,
-      start_at: startOn ? timestamp(startOn) : null,
-      due_at: dueOn ? dueTimestamp(dueOn) : null,
+      start_at: normalizedStart ? timestamp(normalizedStart) : null,
+      due_at: normalizedDue ? dueTimestamp(normalizedDue) : null,
       completed_at: status === "done" ? task?.completed_at ?? new Date().toISOString() : null,
+      recurrence_frequency: recurring ? recurrenceFrequency : null,
+      recurrence_interval: recurring ? Math.max(1, Number(recurrenceInterval) || 1) : 1,
+      recurrence_weekday: recurring && normalizedStart ? new Date(`${normalizedStart}T12:00:00Z`).getUTCDay() : null,
+      recurrence_until: recurring ? recurrenceUntil || null : null,
+      recurrence_next_on: recurrenceNextOn,
+      recurrence_active: recurring,
       deleted_at: null,
     });
     onClose();
@@ -293,6 +347,32 @@ function TaskForm({
             </select>
           </label>
         </div>
+        {sourceType === "recurring" && (
+          <div className="recurrence-box">
+            <div className="recurrence-heading">
+              <strong>반복 규칙</strong>
+              <small>{recurrenceFrequency ? recurrenceText({ ...task, recurrence_frequency: recurrenceFrequency, recurrence_interval: Math.max(1, Number(recurrenceInterval) || 1) } as Task) : ""}</small>
+            </div>
+            <div className="form-pair">
+              <label className="form-field">
+                <span>반복 주기</span>
+                <select value={recurrenceFrequency ?? "daily"} onChange={(event) => setRecurrenceFrequency(event.target.value as Task["recurrence_frequency"])}>
+                  <option value="daily">매일</option>
+                  <option value="weekly">매주</option>
+                  <option value="monthly">매월</option>
+                </select>
+              </label>
+              <label className="form-field">
+                <span>간격</span>
+                <input type="number" min={1} value={recurrenceInterval} onChange={(event) => setRecurrenceInterval(event.target.value)} />
+              </label>
+            </div>
+            <label className="form-field">
+              <span>반복 종료일 (선택)</span>
+              <input type="date" value={recurrenceUntil} onChange={(event) => setRecurrenceUntil(event.target.value)} />
+            </label>
+          </div>
+        )}
         {sourceType === "requested" && (
           <div className="form-pair">
             <label className="form-field">
@@ -364,7 +444,7 @@ function TaskForm({
               className="danger-text"
               onClick={() => {
                 if (window.confirm("이 업무를 휴지통으로 이동할까요?")) {
-                  onArchive(task);
+                  onArchive({ ...task, id: task.recurrence_template_id ?? task.id });
                   onClose();
                 }
               }}
@@ -599,6 +679,7 @@ function TaskRow({
         <strong>{task.title}</strong>
         <small>
           {project?.name ?? "미분류 업무"} · {sourceLabels[task.source_type]}
+          {task.recurrence_frequency ? ` · ${recurrenceText(task)}` : ""}
           {task.requester_name ? ` · ${task.requester_name}` : ""}
         </small>
       </div>
@@ -621,6 +702,7 @@ export function TaskWorkspace({
   onDelete,
   initialProjectId = "",
   initialCreate = false,
+  onCompleteRecurring,
 }: {
   data: Data;
   today: string;
@@ -629,6 +711,7 @@ export function TaskWorkspace({
   onDelete: DeleteRecord;
   initialProjectId?: string;
   initialCreate?: boolean;
+  onCompleteRecurring?: (task: Task, completed: boolean) => void | Promise<void>;
 }) {
   const [filter, setFilter] = useState<"today" | "projects" | "all" | "requested" | "recurring">("today");
   const [view, setView] = useState<"list" | "timeline" | "calendar">("list");
@@ -638,8 +721,12 @@ export function TaskWorkspace({
   const projects = data.workProjects
     .filter((project) => !project.deleted_at)
     .sort((a, b) => a.sort_order - b.sort_order);
+  const materialized = useMemo(
+    () => materializedTasks(data, today),
+    [data, today],
+  );
   const visibleTasks = useMemo(() => {
-    let tasks = data.tasks.filter((task) => !task.deleted_at);
+    let tasks = [...materialized];
     if (filter === "today") {
       tasks = tasks.filter((task) => {
         const start = dateOnly(task.start_at);
@@ -661,16 +748,21 @@ export function TaskWorkspace({
       const bDue = dateOnly(b.due_at) ?? "9999-12-31";
       return aDone - bDone || aDue.localeCompare(bDue) || a.sort_order - b.sort_order;
     });
-  }, [data.tasks, filter, projectId, today]);
-  const toggle = (task: Task) =>
+  }, [materialized, filter, projectId, today]);
+  const toggle = (task: Task) => {
+    if (task.recurrence_template_id && task.occurrence_on && onCompleteRecurring) {
+      void Promise.resolve(onCompleteRecurring(task, task.status !== "done")).catch(() => {});
+      return;
+    }
     onUpdate("tasks", task.id, {
       status: task.status === "done" ? "planned" : "done",
       completed_at: task.status === "done" ? null : new Date().toISOString(),
     });
+  };
   const currentProject = projects.find((project) => project.id === projectId) ?? null;
   const calendarDays = dates(monthPeriod(today.slice(0, 7)));
   const calendarTasks = new Map<string, Task[]>();
-  for (const task of data.tasks.filter((item) => !item.deleted_at)) {
+  for (const task of materialized) {
     const day = dateOnly(task.due_at ?? task.start_at);
     if (day) calendarTasks.set(day, [...(calendarTasks.get(day) ?? []), task]);
   }
@@ -778,7 +870,7 @@ export function TaskWorkspace({
             <section className="task-timeline panel">
               <div className="section-toolbar"><h2>프로젝트 타임라인</h2><small>{today} 기준</small></div>
               {projects.length ? projects.map((project) => {
-                const tasks = data.tasks.filter((task) => !task.deleted_at && task.project_id === project.id);
+                const tasks = materialized.filter((task) => task.project_id === project.id);
                 return <button className="timeline-project" key={project.id} onClick={() => { setProjectId(project.id); setFilter("projects"); }}>
                   <span><strong>{project.name}</strong><small>{project.start_on ?? "시작일 미정"} → {project.due_on ?? "목표일 미정"}</small></span>
                   <i><b style={{ width: `${Math.max(12, Math.min(100, tasks.length ? (tasks.filter((task) => task.status === "done").length / tasks.length) * 100 : 0))}%` }} /></i>

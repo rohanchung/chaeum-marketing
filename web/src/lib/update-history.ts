@@ -9,6 +9,28 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260921-task-recurrence",
+    date: "2026-09-21",
+    title: "반복 업무와 회차 기록",
+    room: "현재 제작방",
+    changes: [
+      "반복 업무를 매일·매주·매월 주기와 간격, 종료일로 저장할 수 있습니다.",
+      "오늘·날짜 활동 패널·업무 캘린더에는 현재 회차만 표시하고, 완료하면 회차 이력을 저장한 뒤 다음 날짜로 넘깁니다.",
+      "반복 회차 원본과 완료 이력을 작업공간 RLS 정책으로 분리해 기존 마케팅 지표·비용·ROI 계산과 격리했습니다.",
+    ],
+  },
+  {
+    id: "20260921-day-activity",
+    date: "2026-09-21",
+    title: "운영시트 날짜 활동 패널",
+    room: "현재 제작방",
+    changes: [
+      "운영시트의 날짜를 누르면 해당 날짜의 업무와 이벤트를 함께 확인합니다.",
+      "날짜 활동 패널에서 해당 날짜로 업무를 바로 추가하고 업무를 완료 처리할 수 있습니다.",
+      "기존 이벤트 기록과 날짜별 지표 입력 흐름, 비용·ROI 계산은 유지했습니다.",
+    ],
+  },
+  {
     id: "20260921-work-management",
     date: "2026-09-21",
     title: "업무·프로젝트 관리 1단계",

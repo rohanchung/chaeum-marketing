@@ -190,6 +190,25 @@ export type Task = Base & {
   sort_order: number;
   created_at?: string;
   updated_at?: string;
+  recurrence_frequency: "daily" | "weekly" | "monthly" | null;
+  recurrence_interval: number;
+  recurrence_weekday: number | null;
+  recurrence_until: string | null;
+  recurrence_next_on: string | null;
+  recurrence_active: boolean;
+  occurrence_on?: string;
+  recurrence_template_id?: string;
+};
+export type TaskOccurrence = {
+  id: string;
+  workspace_id: string;
+  task_id: string;
+  occurrence_on: string;
+  status: "planned" | "done" | "skipped";
+  completed_at: string | null;
+  result: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 export type WorkLink = {
   id: string;
@@ -217,6 +236,7 @@ export type Data = {
   workProjects: WorkProject[];
   tasks: Task[];
   workLinks: WorkLink[];
+  taskOccurrences: TaskOccurrence[];
 };
 export const emptyData: Data = {
   channels: [],
@@ -235,6 +255,7 @@ export const emptyData: Data = {
   workProjects: [],
   tasks: [],
   workLinks: [],
+  taskOccurrences: [],
 };
 export type Period = { start: string; end: string };
 export type MetricRow = {

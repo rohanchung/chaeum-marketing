@@ -19,6 +19,7 @@ export const tables = {
   workProjects: "mkt_work_projects",
   tasks: "mkt_tasks",
   workLinks: "mkt_work_links",
+  taskOccurrences: "mkt_task_occurrences",
 } as const;
 export type Collection = keyof typeof tables;
 export async function fetchRows(table: string, workspace: string) {
