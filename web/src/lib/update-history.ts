@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260921-task-calendar-crud-layout",
+    date: "2026-09-21",
+    title: "캘린더·업무 목록 좌우 배치와 날짜 CRUD",
+    room: "현재 제작방",
+    changes: [
+      "업무 화면을 좌측 캘린더·우측 업무 목록의 수평 구조로 고정하고 상하 여백을 줄였습니다.",
+      "날짜 셀 클릭과 날짜별 추가 버튼으로 해당 날짜 업무를 생성할 수 있게 했습니다.",
+      "캘린더 업무 클릭 시 수정·완료·삭제 흐름을 연결하고 기간 업무는 날짜 칸에 연속 표시합니다.",
+    ],
+  },
+  {
     id: "20260921-task-calendar-first",
     date: "2026-09-21",
     title: "대시보드 업무 분리와 캘린더 중심 업무 화면",

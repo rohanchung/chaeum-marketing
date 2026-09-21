@@ -2738,3 +2738,43 @@ textarea {
     max-height: none;
   }
 }
+
+/* Compact calendar cells and date-level task creation. */
+.work-overview-grid {
+  gap: 6px;
+}
+.work-overview-grid > .panel {
+  padding: 7px;
+}
+.calendar-main .section-toolbar,
+.task-tree .section-toolbar {
+  margin-bottom: 2px;
+}
+.calendar-day {
+  min-height: 68px;
+  padding: 3px;
+}
+.calendar-day-add {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+.calendar-day-add b {
+  font-size: 10px;
+}
+.calendar-day-add span {
+  color: #82a08a;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0;
+}
+.calendar-day:hover .calendar-day-add span,
+.calendar-day.today .calendar-day-add span {
+  opacity: 1;
+}

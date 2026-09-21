@@ -753,6 +753,7 @@ export function TaskWorkspace({
   const [projectId, setProjectId] = useState(initialProjectId);
   const [taskEditor, setTaskEditor] = useState<Task | null | undefined>(initialCreate ? null : undefined);
   const [newTaskProjectId, setNewTaskProjectId] = useState(initialProjectId);
+  const [newTaskDate, setNewTaskDate] = useState("");
   const [projectEditor, setProjectEditor] = useState<WorkProject | null | undefined>();
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const projects = data.workProjects
@@ -799,6 +800,11 @@ export function TaskWorkspace({
   const currentProject = projects.find((project) => project.id === projectId) ?? null;
   const calendarDays = dates(monthPeriod(today.slice(0, 7)));
   const calendarTasks = new Map<string, Task[]>();
+  const openTaskForDate = (day: string) => {
+    setNewTaskProjectId("");
+    setNewTaskDate(day);
+    setTaskEditor(null);
+  };
   for (const task of visibleTasks) {
     const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
     const due = dateOnly(task.due_at) ?? start;
@@ -821,7 +827,7 @@ export function TaskWorkspace({
         </div>
         <div className="inline-tools">
           <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
-          <button className="primary" onClick={() => { setNewTaskProjectId(""); setTaskEditor(null); }}>＋ 업무</button>
+          <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(""); setTaskEditor(null); }}>＋ 업무</button>
         </div>
       </div>
       <div className="work-filters">
@@ -868,6 +874,25 @@ export function TaskWorkspace({
             />
           )}
           <div className="work-overview-grid">
+            <section className="task-calendar calendar-main panel">
+              <div className="section-toolbar"><h2>{today.slice(0, 7).replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 사이 업무 흐름 포함 · 오늘 {today.slice(5).replace("-", "/")}</small></div>
+              <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
+              <div className="calendar-grid">
+                {calendarDays.map((day) => <div className={day === today ? "calendar-day today" : "calendar-day"} key={day} onClick={() => openTaskForDate(day)}>
+                  <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>
+                    <b>{Number(day.slice(-2))}</b><span>＋</span>
+                  </button>
+                  {(calendarTasks.get(day) ?? []).slice(0, 4).map((task) => {
+                    const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
+                    const continues = start !== day;
+                    return <button className={`calendar-task${continues ? " continues" : ""}`} key={`${task.id}:${day}`} onClick={(event) => { event.stopPropagation(); setTaskEditor(task); }}>
+                      {continues ? `↳ ${task.title}` : task.title}
+                    </button>;
+                  })}
+                  {(calendarTasks.get(day) ?? []).length > 4 && <small className="calendar-more">+ {(calendarTasks.get(day) ?? []).length - 4}건</small>}
+                </div>)}
+              </div>
+            </section>
             <section className="task-list task-tree panel">
               <div className="section-toolbar">
                 <div>
@@ -876,7 +901,7 @@ export function TaskWorkspace({
                 </div>
                 <div className="inline-tools">
                   <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
-                  <button onClick={() => { setNewTaskProjectId(""); setTaskEditor(null); }}>＋ 업무</button>
+                  <button onClick={() => { setNewTaskProjectId(""); setNewTaskDate(""); setTaskEditor(null); }}>＋ 업무</button>
                 </div>
               </div>
               {projects.map((project) => {
@@ -901,7 +926,7 @@ export function TaskWorkspace({
                         <small>{done}/{total} 완료 · {project.start_on ?? "시작일 미정"} → {project.due_on ?? "목표일 미정"}</small>
                       </button>
                       <div className="project-tree-actions">
-                        <button aria-label={`${project.name} 업무 추가`} onClick={() => { setNewTaskProjectId(project.id); setTaskEditor(null); }}>＋ 업무</button>
+                        <button aria-label={`${project.name} 업무 추가`} onClick={() => { setNewTaskProjectId(project.id); setNewTaskDate(""); setTaskEditor(null); }}>＋ 업무</button>
                         <button aria-label={`${project.name} 업무만 보기`} onClick={() => { setProjectId(project.id); setFilter("projects"); }}>보기</button>
                         <button aria-label={`${project.name} 수정`} onClick={() => setProjectEditor(project)}>⋯</button>
                       </div>
@@ -936,26 +961,9 @@ export function TaskWorkspace({
               {!projects.length && !visibleTasks.length && <div className="empty-small">프로젝트 또는 업무를 추가해 보세요.</div>}
             </section>
           </div>
-          <section className="task-calendar calendar-main panel">
-            <div className="section-toolbar"><h2>{today.slice(0, 7).replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 사이 업무 흐름 포함 · 오늘 {today.slice(5).replace("-", "/")}</small></div>
-            <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
-            <div className="calendar-grid">
-              {calendarDays.map((day) => <div className={day === today ? "calendar-day today" : "calendar-day"} key={day}>
-                <b>{Number(day.slice(-2))}</b>
-                {(calendarTasks.get(day) ?? []).slice(0, 4).map((task) => {
-                  const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
-                  const continues = start !== day;
-                  return <button className={`calendar-task${continues ? " continues" : ""}`} key={`${task.id}:${day}`} onClick={() => setTaskEditor(task)}>
-                    {continues ? `↳ ${task.title}` : task.title}
-                  </button>;
-                })}
-                {(calendarTasks.get(day) ?? []).length > 4 && <small className="calendar-more">+ {(calendarTasks.get(day) ?? []).length - 4}건</small>}
-              </div>)}
-            </div>
-          </section>
         </main>
       </div>
-      {taskEditor !== undefined && <TaskForm data={data} today={today} task={taskEditor} initialProjectId={taskEditor ? "" : newTaskProjectId} onSave={onSave} onArchive={(task) => onUpdate("tasks", task.id, { deleted_at: new Date().toISOString() })} onClose={() => setTaskEditor(undefined)} />}
+      {taskEditor !== undefined && <TaskForm data={data} today={today} task={taskEditor} initialProjectId={taskEditor ? "" : newTaskProjectId} initialDate={taskEditor ? "" : newTaskDate} onSave={onSave} onArchive={(task) => onUpdate("tasks", task.id, { deleted_at: new Date().toISOString() })} onClose={() => { setTaskEditor(undefined); setNewTaskDate(""); }} />}
       {projectEditor !== undefined && <ProjectForm data={data} project={projectEditor} onSave={onSave} onClose={() => setProjectEditor(undefined)} />}
     </div>
   );
