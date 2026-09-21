@@ -996,6 +996,19 @@ a:hover {
   background: #e6f3ec;
   font-size: 10px;
 }
+.task-day-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 13px;
+  height: 13px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: #e7f1e9;
+  color: #287a56;
+  font-size: 8px;
+  font-style: normal;
+  line-height: 1;
+}
 .event-day {
   width: min(480px, 95vw);
   max-height: 80vh;
@@ -1834,4 +1847,407 @@ textarea {
 .purchase-item span,
 .event-purchases small {
   font-size: 11px;
+}
+
+/* Work management --------------------------------------------------------- */
+.today-activity {
+  margin-bottom: 6px;
+  padding: 9px 12px;
+}
+.today-activity .section-toolbar,
+.project-summary .section-toolbar {
+  margin-bottom: 6px;
+}
+.today-activity h2,
+.project-summary h2 {
+  font-size: 14px;
+}
+.today-activity-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.today-activity-item {
+  display: grid;
+  grid-template-columns: 15px minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 245px;
+  padding: 6px 8px;
+  border: 1px solid #e4ebe3;
+  border-radius: 5px;
+  background: #fbfdf9;
+}
+.today-activity-item strong,
+.task-row-main strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 650;
+}
+.today-activity-item small,
+.task-row-main small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+.today-activity-item > span,
+.task-due {
+  white-space: nowrap;
+  font-size: 10px;
+  color: #63786a;
+}
+.today-activity-empty {
+  padding: 6px 2px 1px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.today-activity-empty button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  font-size: 11px;
+}
+.task-alert,
+.task-overdue {
+  color: #b25345;
+  font-weight: 650;
+}
+.project-summary {
+  margin-top: 6px;
+  padding: 9px 12px;
+}
+.project-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+}
+.project-summary-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 9px;
+  border-color: #e1e9e0;
+  text-align: left;
+}
+.project-summary-card strong {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.project-summary-card span,
+.project-summary-card small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.work-page .page-title {
+  margin-bottom: 8px;
+}
+.work-filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.work-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.work-project-list,
+.work-main > .panel,
+.work-main > section.panel {
+  padding: 10px;
+}
+.work-project-list {
+  position: sticky;
+  top: 52px;
+}
+.work-project-list .section-toolbar {
+  margin-bottom: 5px;
+}
+.work-project-list .section-toolbar h2 {
+  font-size: 14px;
+}
+.project-filter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  margin-bottom: 3px;
+  padding: 6px 7px;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+.project-filter.selected {
+  border-color: #cfe2d3;
+  background: #eef7ef;
+  color: #246c4c;
+}
+.project-filter strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.project-filter small {
+  font-size: 9px;
+}
+.project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.project-header h2 {
+  margin: 2px 0;
+}
+.project-header p {
+  color: var(--muted);
+  font-size: 10px;
+}
+.project-links {
+  margin-bottom: 8px;
+}
+.project-link-add {
+  display: grid;
+  grid-template-columns: 105px minmax(0, 1fr) auto;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+.project-link-add select,
+.project-link-add button {
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+.project-link-list {
+  border-top: 1px solid #edf1ed;
+}
+.project-link-row {
+  display: grid;
+  grid-template-columns: 65px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 29px;
+  border-bottom: 1px solid #edf1ed;
+  font-size: 11px;
+}
+.project-link-row > span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.project-link-row > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 550;
+}
+.project-link-row > button {
+  padding: 2px 5px;
+  border: 0;
+  background: transparent;
+  color: #9a776d;
+  font-size: 10px;
+}
+.project-status {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #e9f3eb;
+  color: #33744f;
+  font-size: 10px;
+}
+.project-status.paused {
+  background: #fff2df;
+  color: #a16e32;
+}
+.project-status.completed {
+  background: #f0f2ef;
+  color: #78857c;
+}
+.task-list .section-toolbar,
+.task-timeline .section-toolbar,
+.task-calendar .section-toolbar {
+  margin-bottom: 4px;
+}
+.task-list .section-toolbar h2,
+.task-timeline .section-toolbar h2,
+.task-calendar .section-toolbar h2 {
+  font-size: 14px;
+}
+.task-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto 28px;
+  align-items: center;
+  gap: 7px;
+  min-height: 39px;
+  padding: 5px 3px;
+  border-top: 1px solid #edf1ed;
+}
+.task-row:first-of-type {
+  border-top: 0;
+}
+.task-row.overdue {
+  background: #fffaf8;
+}
+.task-row > button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 17px;
+  color: var(--muted);
+}
+.task-row-main {
+  min-width: 0;
+}
+.task-status {
+  color: #6b7c71;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.task-editor {
+  width: 470px;
+}
+.task-editor .form-field {
+  margin-bottom: 9px;
+  gap: 4px;
+}
+.task-editor .form-field > span {
+  font-size: 11px;
+}
+.task-editor textarea {
+  resize: vertical;
+}
+.timeline-project {
+  display: grid;
+  grid-template-columns: 210px minmax(100px, 1fr) 35px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+  border-color: #e7ede7;
+  text-align: left;
+}
+.timeline-project > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.timeline-project strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.timeline-project small,
+.timeline-project em {
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+}
+.timeline-project > i {
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #edf1ed;
+}
+.timeline-project > i b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #4e986e;
+}
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.calendar-weekdays {
+  margin-bottom: 3px;
+}
+.calendar-weekdays b {
+  padding: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+}
+.calendar-day {
+  min-height: 82px;
+  padding: 4px;
+  border-top: 1px solid #edf1ed;
+  border-left: 1px solid #edf1ed;
+}
+.calendar-day:nth-child(7n + 1) {
+  border-left: 0;
+}
+.calendar-day.today {
+  background: #eff8f0;
+  box-shadow: inset 0 2px #287a56;
+}
+.calendar-day > b {
+  font-size: 11px;
+}
+.calendar-day button {
+  display: block;
+  width: 100%;
+  margin-top: 3px;
+  overflow: hidden;
+  padding: 2px 3px;
+  border: 0;
+  border-radius: 3px;
+  background: #eaf4ed;
+  color: #3a6f4e;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+}
+@media (max-width: 760px) {
+  .work-filters {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .work-layout {
+    grid-template-columns: 1fr;
+  }
+  .work-project-list {
+    position: static;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  .work-project-list .section-toolbar {
+    flex: 0 0 auto;
+  }
+  .project-filter {
+    flex: 0 0 155px;
+  }
+  .task-row {
+    grid-template-columns: 16px minmax(0, 1fr) auto 28px;
+  }
+  .task-status {
+    display: none;
+  }
+  .timeline-project {
+    grid-template-columns: 1fr 70px 30px;
+  }
+  .calendar-day {
+    min-height: 62px;
+  }
 }

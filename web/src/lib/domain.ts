@@ -140,6 +140,66 @@ export type Snapshot = {
   created_at: string;
   snapshot: Report;
 };
+export type WorkArea = Base & {
+  name: string;
+  description: string | null;
+  color: string | null;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+};
+export type WorkProject = Base & {
+  area_id: string;
+  name: string;
+  description: string | null;
+  status: "active" | "completed" | "paused";
+  priority: "low" | "normal" | "high";
+  start_on: string | null;
+  due_on: string | null;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+};
+export type TaskSource = "self" | "requested" | "recurring";
+export type TaskStatus =
+  | "requested"
+  | "planned"
+  | "in_progress"
+  | "waiting"
+  | "on_hold"
+  | "done"
+  | "cancelled";
+export type TaskPriority = "low" | "normal" | "high";
+export type Task = Base & {
+  area_id: string | null;
+  project_id: string | null;
+  title: string;
+  description: string | null;
+  result: string | null;
+  next_action: string | null;
+  source_type: TaskSource;
+  requester_name: string | null;
+  requested_on: string | null;
+  request_note: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  start_at: string | null;
+  due_at: string | null;
+  remind_at: string | null;
+  completed_at: string | null;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+};
+export type WorkLink = {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  task_id: string | null;
+  entity_type: "channel" | "content" | "promotion" | "event" | "purchase";
+  entity_id: string;
+  created_at?: string;
+};
 export type Data = {
   channels: Channel[];
   contents: Content[];
@@ -153,6 +213,10 @@ export type Data = {
   customers: Customer[];
   payments: Payment[];
   snapshots: Snapshot[];
+  workAreas: WorkArea[];
+  workProjects: WorkProject[];
+  tasks: Task[];
+  workLinks: WorkLink[];
 };
 export const emptyData: Data = {
   channels: [],
@@ -167,6 +231,10 @@ export const emptyData: Data = {
   customers: [],
   payments: [],
   snapshots: [],
+  workAreas: [],
+  workProjects: [],
+  tasks: [],
+  workLinks: [],
 };
 export type Period = { start: string; end: string };
 export type MetricRow = {

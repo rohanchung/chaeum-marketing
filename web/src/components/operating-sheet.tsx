@@ -6,6 +6,7 @@ import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
 import {
   CellChange,
   Data,
+  Task,
   Metric,
   MetricRow,
   Period,
@@ -163,6 +164,7 @@ export function OperatingSheet({
   today,
   clockSynced,
   actions,
+  tasks = [],
 }: {
   data: Data;
   period: Period;
@@ -180,6 +182,7 @@ export function OperatingSheet({
   today: string;
   clockSynced: boolean;
   actions?: ReactNode;
+  tasks?: Task[];
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [dragging, setDragging] = useState<string | null>(null);
@@ -191,6 +194,13 @@ export function OperatingSheet({
   const sortedChannels = orderedChannels(data.channels).filter(
     (ch) => !ch.deleted_at && !isEventChannel(ch),
   );
+  const taskCount = (date: string) =>
+    tasks.filter(
+      (task) =>
+        !task.deleted_at &&
+        task.status !== "cancelled" &&
+        (datePart(task.due_at) === date || datePart(task.start_at) === date),
+    ).length;
   const reorderChannel = (
     id: string,
     target: string,
@@ -712,6 +722,9 @@ export function OperatingSheet({
                     {data.events.some(
                       (e) => !e.deleted_at && datePart(e.starts_at) === date,
                     ) && <i className="event-dot" />}
+                    {taskCount(date) > 0 && (
+                      <em className="task-day-count">{taskCount(date)}</em>
+                    )}
                   </button>
                 </th>
               ))}

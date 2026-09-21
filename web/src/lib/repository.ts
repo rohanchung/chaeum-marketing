@@ -15,6 +15,10 @@ export const tables = {
   customers: "mkt_customers",
   payments: "mkt_payments",
   snapshots: "report_snapshots",
+  workAreas: "mkt_work_areas",
+  workProjects: "mkt_work_projects",
+  tasks: "mkt_tasks",
+  workLinks: "mkt_work_links",
 } as const;
 export type Collection = keyof typeof tables;
 export async function fetchRows(table: string, workspace: string) {
@@ -84,6 +88,18 @@ export async function updateRecord(
     .single();
   if (error) throw new Error(error.message);
   return data;
+}
+export async function deleteRecord(
+  workspace: string,
+  collection: Collection,
+  id: string,
+) {
+  const { error } = await supabase
+    .from(tables[collection])
+    .delete()
+    .eq("workspace_id", workspace)
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 }
 export async function saveCells(workspace: string, cells: CellChange[]) {
   const { error } = await supabase.rpc("mkt_save_cells", {

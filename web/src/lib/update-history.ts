@@ -9,6 +9,19 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260921-work-management",
+    date: "2026-09-21",
+    title: "업무·프로젝트 관리 1단계",
+    room: "현재 제작방",
+    changes: [
+      "업무 영역·프로젝트·Task를 저장하고 요청자·마감일·실행 예정일·처리 결과를 관리하는 업무 페이지를 추가했습니다.",
+      "오늘·프로젝트·전체·요청받은 업무·반복 업무 필터와 목록·타임라인·캘린더 보기를 연결했습니다.",
+      "대시보드에 오늘의 프로젝트 활동과 진행 중 프로젝트 요약을 추가하고 기존 KPI·운영시트와 연결했습니다.",
+      "프로젝트 상세에서 이벤트·채널·콘텐츠·광고 집행·구매 원본을 연결하고 해제할 수 있습니다.",
+      "Task 완료는 업무 데이터만 변경하며 기존 마케팅 비용·지표·ROI 계산에는 영향을 주지 않습니다.",
+    ],
+  },
+  {
     id: "20260916-pretendard",
     date: "2026-09-16",
     title: "전체 글꼴을 프리텐다드로 통일",

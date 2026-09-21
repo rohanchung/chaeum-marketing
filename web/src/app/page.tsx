@@ -45,6 +45,7 @@ import {
   saveMetricOrder,
   saveChannelOrder,
   saveRecord,
+  deleteRecord,
   updateRecord,
 } from "@/lib/repository";
 import { downloadExcelReport, openPrintableReport } from "@/lib/report-export";
@@ -57,8 +58,13 @@ import { moveChannel } from "@/lib/channel-order";
 import { eventCost, unitCost, usedQuantity } from "@/lib/purchases";
 import { UpdateLog } from "@/components/update-log";
 import { useNavigation } from "@/components/use-navigation";
+import {
+  ProjectActivitySummary,
+  TaskWorkspace,
+  TodayActivity,
+} from "@/components/task-workspace";
 
-const tabs = ["대시보드", "콘텐츠", "이벤트", "구매", "분석", "리포트", "로그"];
+const tabs = ["대시보드", "업무", "콘텐츠", "이벤트", "구매", "분석", "리포트", "로그"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
 export default function Home() {
   const [workspace, setWorkspace] = useState<string | null>(null);
@@ -78,6 +84,7 @@ export default function Home() {
   const [busy, setBusy] = useState(0);
   const [ready, setReady] = useState(false);
   const [analysisTab, setAnalysisTab] = useState("성과");
+  const [taskProjectId, setTaskProjectId] = useState("");
   const [lifecycle, setLifecycle] = useState("active");
   const [search, setSearch] = useState("");
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
@@ -504,7 +511,7 @@ export default function Home() {
           </div>
           {nav !== "로그" && (
             <div className="toolbar-controls">
-              {nav !== "대시보드" && (
+              {nav !== "대시보드" && nav !== "업무" && (
                 <div className="segmented">
                   {[
                     ["day", "일"],
@@ -621,9 +628,29 @@ export default function Home() {
           <>
             {nav === "대시보드" && (
               <>
+                <TodayActivity
+                  data={data}
+                  today={today}
+                  onOpen={() => {
+                    setTaskProjectId("");
+                    setNav("업무");
+                  }}
+                  onToggle={(task) =>
+                    changeState("tasks", task.id, {
+                      status: task.status === "done" ? "planned" : "done",
+                      completed_at:
+                        task.status === "done" ? null : new Date().toISOString(),
+                    })
+                  }
+                  onAdd={() => {
+                    setTaskProjectId("");
+                    setNav("업무");
+                  }}
+                />
                 <Kpis report={currentReport} compact />
                 <OperatingSheet
                   data={data}
+                  tasks={data.tasks}
                   period={period}
                   today={today}
                   clockSynced={clockSynced}
@@ -705,7 +732,31 @@ export default function Home() {
                     </div>
                   }
                 />
+                <ProjectActivitySummary
+                  data={data}
+                  today={today}
+                  onOpen={(projectId) => {
+                    setTaskProjectId(projectId);
+                    setNav("업무");
+                  }}
+                />
               </>
+            )}
+            {nav === "업무" && (
+              <TaskWorkspace
+                data={data}
+                today={today}
+                initialProjectId={taskProjectId}
+                onSave={(collection, record) => mutate(collection, record)}
+                onUpdate={(collection, id, patch) => changeState(collection, id, patch)}
+                onDelete={(collection, id) =>
+                  fire(async () => {
+                    await deleteRecord(workspace, collection, id);
+                    await refresh(workspace);
+                    setNotice("연결을 해제했습니다.");
+                  })
+                }
+              />
             )}
             {nav === "콘텐츠" && (
               <>
@@ -1445,6 +1496,28 @@ export default function Home() {
                             { p_workspace: workspace, p_backup: backup.tables },
                           );
                           if (error) throw error;
+                          for (const table of [
+                            "mkt_work_areas",
+                            "mkt_work_projects",
+                            "mkt_tasks",
+                            "mkt_work_links",
+                          ] as const) {
+                            const rows = backup.tables[table];
+                            if (!Array.isArray(rows) || rows.length === 0) continue;
+                            if (
+                              rows.some(
+                                (row: Record<string, unknown>) =>
+                                  row.workspace_id !== workspace,
+                              )
+                            )
+                              throw new Error(
+                                "업무 백업에 다른 작업공간 기록이 포함되어 있습니다.",
+                              );
+                            const { error: workError } = await supabase
+                              .from(table)
+                              .upsert(rows);
+                            if (workError) throw workError;
+                          }
                           await refresh(workspace);
                           setNotice("백업 복원을 완료했습니다.");
                         });
