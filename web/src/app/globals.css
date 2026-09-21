@@ -1419,6 +1419,301 @@ a:hover {
   }
 }
 
+/* Keep the task workspace in the requested one-page layout after the dense base rules. */
+.notice {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  margin: 0;
+  box-shadow: 0 8px 24px rgb(31 64 43 / 14%);
+}
+.work-layout {
+  display: block;
+}
+.work-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  gap: 8px;
+  align-items: start;
+}
+.work-overview-grid > .panel {
+  min-width: 0;
+  padding: 10px;
+}
+.timeline-project {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 0;
+  border: 1px solid #e7ede7;
+  border-radius: 6px;
+  background: #fff;
+  text-align: left;
+}
+.timeline-project-head {
+  display: grid;
+  grid-template-columns: 150px minmax(70px, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.timeline-task {
+  display: flex;
+  width: calc(100% - 16px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0 8px 4px 16px;
+  padding: 4px 6px;
+  border: 0;
+  border-left: 2px solid #dbe9dc;
+  border-radius: 0;
+  background: #fafcf9;
+  color: #405b48;
+  text-align: left;
+  font-size: 10px;
+}
+@media (max-width: 900px) {
+  .work-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .timeline-project-head {
+    grid-template-columns: 1fr 66px 30px;
+  }
+  .timeline-task small {
+    display: none;
+  }
+}
+
+/* Task workspace overview: keep hierarchy, timeline, and calendar visible together. */
+.notice {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  margin: 0;
+  box-shadow: 0 8px 24px rgb(31 64 43 / 14%);
+}
+.work-view-note {
+  color: var(--muted);
+  font-size: 10px;
+}
+.work-layout {
+  display: block;
+}
+.work-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  gap: 8px;
+  align-items: start;
+}
+.work-overview-grid > .panel {
+  min-width: 0;
+  padding: 10px;
+}
+.project-group {
+  border-top: 1px solid #edf1ed;
+}
+.project-group:first-of-type {
+  border-top: 0;
+}
+.project-tree-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 33px;
+}
+.project-tree-title {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 2px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.project-tree-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.project-tree-title small {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+}
+.project-disclosure {
+  width: 12px;
+  color: #5f7f68;
+  font-size: 11px;
+}
+.project-tree-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+.project-tree-actions button {
+  padding: 2px 5px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+}
+.project-tree-empty {
+  margin: 0 0 5px 22px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.unassigned-group {
+  margin-top: 3px;
+  border-top: 1px dashed #dfe8df;
+}
+.task-tree .task-row {
+  margin-left: 17px;
+  border-top-color: #f0f3ef;
+}
+.task-row-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  margin-top: 2px;
+  color: #7c8e82;
+  font-size: 9px;
+}
+.task-dependency {
+  display: block;
+  margin-top: 2px;
+  color: #6d8875;
+  font-size: 9px;
+}
+.task-dependency.blocked,
+.task-status.blocked {
+  color: #aa6a54;
+}
+.task-row.blocked {
+  background: #fffaf7;
+}
+.task-timeline {
+  max-height: 520px;
+  overflow: auto;
+}
+.timeline-project {
+  display: block;
+  margin-top: 5px;
+  padding: 0;
+  border: 1px solid #e7ede7;
+  border-radius: 6px;
+  background: #fff;
+}
+.timeline-project-head {
+  display: grid;
+  grid-template-columns: 150px minmax(70px, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.timeline-project-head > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.timeline-project-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.timeline-project-head small,
+.timeline-project-head em {
+  color: var(--muted);
+  font-size: 9px;
+  font-style: normal;
+}
+.timeline-project-head > i {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #edf1ed;
+}
+.timeline-project-head > i b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #4e986e;
+}
+.timeline-task {
+  display: flex;
+  width: calc(100% - 16px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0 8px 4px 16px;
+  padding: 4px 6px;
+  border: 0;
+  border-left: 2px solid #dbe9dc;
+  border-radius: 0;
+  background: #fafcf9;
+  color: #405b48;
+  text-align: left;
+  font-size: 10px;
+}
+.timeline-task span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeline-task small,
+.timeline-more {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 9px;
+}
+.timeline-more {
+  display: block;
+  margin: 2px 8px 7px 24px;
+}
+@media (max-width: 900px) {
+  .work-overview-grid {
+    grid-template-columns: 1fr;
+  }
+  .task-timeline {
+    max-height: none;
+  }
+}
+@media (max-width: 560px) {
+  .timeline-project-head {
+    grid-template-columns: 1fr 66px 30px;
+  }
+  .timeline-task small {
+    display: none;
+  }
+  .task-tree .task-row {
+    margin-left: 8px;
+  }
+}
+
 /* Dense daily workspace: give the available height to the operating sheet. */
 body {
   font-size: 13px;
@@ -2309,5 +2604,80 @@ textarea {
   }
   .calendar-day {
     min-height: 62px;
+  }
+}
+
+/* Final task workspace overrides: keep list, timeline, and calendar visible together. */
+.notice {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  margin: 0;
+  box-shadow: 0 8px 24px rgb(31 64 43 / 14%);
+}
+.work-layout {
+  display: block;
+}
+.work-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  gap: 8px;
+  align-items: start;
+}
+.work-overview-grid > .panel {
+  min-width: 0;
+  padding: 10px;
+}
+.timeline-project {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 0;
+  border: 1px solid #e7ede7;
+  border-radius: 6px;
+  background: #fff;
+  text-align: left;
+}
+.timeline-project-head {
+  display: grid;
+  grid-template-columns: 150px minmax(70px, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.timeline-task {
+  display: flex;
+  width: calc(100% - 16px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0 8px 4px 16px;
+  padding: 4px 6px;
+  border: 0;
+  border-left: 2px solid #dbe9dc;
+  border-radius: 0;
+  background: #fafcf9;
+  color: #405b48;
+  text-align: left;
+  font-size: 10px;
+}
+@media (max-width: 900px) {
+  .work-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .timeline-project-head {
+    grid-template-columns: 1fr 66px 30px;
+  }
+  .timeline-task small {
+    display: none;
   }
 }

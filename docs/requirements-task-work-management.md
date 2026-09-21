@@ -124,6 +124,7 @@
 - FR-022: 우선순위는 높음·보통·낮음으로 구분한다.
 - FR-023: 오늘 화면은 마감 초과, 오늘 마감, 오늘 실행, 우선순위 순으로 정렬한다.
 - FR-024: 사용자는 프로젝트와 Task의 순서를 드래그 또는 위·아래 버튼으로 조정할 수 있어야 한다.
+- FR-025: Task는 등록일·실행 예정일·마감일을 함께 표시하고, 선행 Task를 최대 1건 지정해 미완료 선행 업무를 표시해야 한다.
 
 ### 6.4 반복 업무
 
@@ -160,7 +161,8 @@
 ```text
 업무
 [오늘 5] [이번 주] [전체] [요청받은 업무] [반복 업무]
-[목록] [타임라인] [캘린더]
+[목록·프로젝트 계층]                 [타임라인]
+[캘린더]
 
 빠른 업무 추가: [제목                         ] [요청자] [마감일] [+]
 
@@ -207,7 +209,7 @@
 - `source_type` (`self`, `requested`, `recurring`)
 - `requester_name`, `requested_at`, `request_note`
 - `status`, `priority`, `start_at`, `due_at`, `remind_at`
-- `completed_at`, `sort_order`, `deleted_at`, `created_at`, `updated_at`
+- `completed_at`, `depends_on_task_id`, `sort_order`, `deleted_at`, `created_at`, `updated_at`
 - 기존 이벤트·콘텐츠·채널 연결용 `linked_entity_type`, `linked_entity_id`
 
 ### 8.4 `mkt_task_recurrences`

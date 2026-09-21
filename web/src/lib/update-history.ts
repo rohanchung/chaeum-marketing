@@ -9,6 +9,18 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260921-task-workspace-hierarchy",
+    date: "2026-09-21",
+    title: "업무 페이지 계층·통합 보기",
+    room: "현재 제작방",
+    changes: [
+      "저장 완료 안내를 레이아웃을 밀어내지 않는 자동 사라짐 토스트로 바꿨습니다.",
+      "프로젝트 업무 목록·타임라인·캘린더를 한 화면에 동시에 표시하고, 프로젝트를 접고 펼치는 하위 업무 트리로 정리했습니다.",
+      "일반 업무 추가는 미분류로 시작하고 프로젝트 행의 업무 추가는 해당 프로젝트를 이어받으며, 등록일·실행 예정일·마감일과 선행 업무·선행 대기 상태를 표시합니다.",
+      "mkt_tasks에 단일 선행 업무 참조와 자기 참조 방지 제약을 추가했습니다.",
+    ],
+  },
+  {
     id: "20260921-task-recurrence",
     date: "2026-09-21",
     title: "반복 업무와 회차 기록",

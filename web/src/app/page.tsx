@@ -202,6 +202,11 @@ export default function Home() {
     window.addEventListener("beforeunload", listener);
     return () => window.removeEventListener("beforeunload", listener);
   }, [busy]);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
   async function run(action: () => Promise<void>) {
     setBusy((b) => b + 1);
     setError("");

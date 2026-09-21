@@ -11,7 +11,6 @@ import {
   dates,
   localDate,
   monthPeriod,
-  number,
   timestamp,
 } from "@/lib/domain";
 import { Collection } from "@/lib/repository";
@@ -53,6 +52,10 @@ const dateLabel = (value: string | null, today: string) => {
   if (date < today) return "기한 초과";
   if (date === today) return "오늘";
   return date.slice(5).replace("-", "/");
+};
+const compactDate = (value: string | null | undefined) => {
+  const date = dateOnly(value ?? null);
+  return date ? date.slice(5).replace("-", "/") : "—";
 };
 const activeTask = (task: Task) =>
   !task.deleted_at && task.status !== "done" && task.status !== "cancelled";
@@ -236,6 +239,7 @@ export function TaskForm({
   data,
   today,
   task,
+  initialProjectId = "",
   initialDate = "",
   onSave,
   onArchive,
@@ -244,12 +248,13 @@ export function TaskForm({
   data: Data;
   today: string;
   task: Task | null;
+  initialProjectId?: string;
   initialDate?: string;
   onSave: Save;
   onArchive: (task: Task) => void;
   onClose: () => void;
 }) {
-  const initialProject = task?.project_id ?? data.workProjects.find((p) => !p.deleted_at)?.id ?? "";
+  const initialProject = task?.project_id ?? initialProjectId;
   const [title, setTitle] = useState(task?.title ?? "");
   const [projectId, setProjectId] = useState(initialProject);
   const [sourceType, setSourceType] = useState<TaskSource>(task?.source_type ?? "self");
@@ -262,6 +267,7 @@ export function TaskForm({
   const [requestNote, setRequestNote] = useState(task?.request_note ?? "");
   const [result, setResult] = useState(task?.result ?? "");
   const [nextAction, setNextAction] = useState(task?.next_action ?? "");
+  const [dependsOnTaskId, setDependsOnTaskId] = useState(task?.depends_on_task_id ?? "");
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<Task["recurrence_frequency"]>(
     task?.recurrence_frequency ?? "daily",
   );
@@ -298,6 +304,7 @@ export function TaskForm({
       start_at: normalizedStart ? timestamp(normalizedStart) : null,
       due_at: normalizedDue ? dueTimestamp(normalizedDue) : null,
       completed_at: status === "done" ? task?.completed_at ?? new Date().toISOString() : null,
+      depends_on_task_id: dependsOnTaskId || null,
       recurrence_frequency: recurring ? recurrenceFrequency : null,
       recurrence_interval: recurring ? Math.max(1, Number(recurrenceInterval) || 1) : 1,
       recurrence_weekday: recurring && normalizedStart ? new Date(`${normalizedStart}T12:00:00Z`).getUTCDay() : null,
@@ -347,6 +354,21 @@ export function TaskForm({
             </select>
           </label>
         </div>
+        <label className="form-field">
+          <span>선행 업무 (선택)</span>
+          <select value={dependsOnTaskId} onChange={(event) => setDependsOnTaskId(event.target.value)}>
+            <option value="">없음</option>
+            {data.tasks
+              .filter((item) => !item.deleted_at && item.id !== (task?.recurrence_template_id ?? task?.id))
+              .sort((a, b) => a.title.localeCompare(b.title, "ko"))
+              .map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                  {item.project_id ? ` · ${data.workProjects.find((project) => project.id === item.project_id)?.name ?? ""}` : ""}
+                </option>
+              ))}
+          </select>
+        </label>
         {sourceType === "recurring" && (
           <div className="recurrence-box">
             <div className="recurrence-heading">
@@ -665,10 +687,12 @@ function TaskRow({
   onEdit: (task: Task) => void;
 }) {
   const project = data.workProjects.find((item) => item.id === task.project_id);
+  const dependency = data.tasks.find((item) => item.id === task.depends_on_task_id && !item.deleted_at);
+  const dependencyBlocked = !!dependency && dependency.status !== "done" && dependency.status !== "cancelled";
   const due = dateOnly(task.due_at);
   const overdue = due !== null && due < today && task.status !== "done";
   return (
-    <div className={`task-row${overdue ? " overdue" : ""}`}>
+    <div className={`task-row${overdue ? " overdue" : ""}${dependencyBlocked ? " blocked" : ""}`}>
       <input
         type="checkbox"
         checked={task.status === "done"}
@@ -682,8 +706,20 @@ function TaskRow({
           {task.recurrence_frequency ? ` · ${recurrenceText(task)}` : ""}
           {task.requester_name ? ` · ${task.requester_name}` : ""}
         </small>
+        <div className="task-row-dates">
+          <span>등록 {compactDate(task.created_at)}</span>
+          <span>실행 {compactDate(task.start_at)}</span>
+          <span>마감 {compactDate(task.due_at)}</span>
+        </div>
+        {dependency && (
+          <small className={`task-dependency${dependencyBlocked ? " blocked" : ""}`}>
+            선행: {dependency.title} · {dependencyBlocked ? "미완료" : "완료"}
+          </small>
+        )}
       </div>
-      <span className="task-status">{statusLabels[task.status]}</span>
+      <span className={`task-status${dependencyBlocked ? " blocked" : ""}`}>
+        {dependencyBlocked ? "선행 대기" : statusLabels[task.status]}
+      </span>
       <span className={`task-due${overdue ? " task-overdue" : ""}`}>
         {dateLabel(task.due_at ?? task.start_at, today)}
       </span>
@@ -713,11 +749,12 @@ export function TaskWorkspace({
   initialCreate?: boolean;
   onCompleteRecurring?: (task: Task, completed: boolean) => void | Promise<void>;
 }) {
-  const [filter, setFilter] = useState<"today" | "projects" | "all" | "requested" | "recurring">("today");
-  const [view, setView] = useState<"list" | "timeline" | "calendar">("list");
+  const [filter, setFilter] = useState<"today" | "projects" | "all" | "requested" | "recurring">("all");
   const [projectId, setProjectId] = useState(initialProjectId);
   const [taskEditor, setTaskEditor] = useState<Task | null | undefined>(initialCreate ? null : undefined);
+  const [newTaskProjectId, setNewTaskProjectId] = useState(initialProjectId);
   const [projectEditor, setProjectEditor] = useState<WorkProject | null | undefined>();
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const projects = data.workProjects
     .filter((project) => !project.deleted_at)
     .sort((a, b) => a.sort_order - b.sort_order);
@@ -749,6 +786,7 @@ export function TaskWorkspace({
       return aDone - bDone || aDue.localeCompare(bDue) || a.sort_order - b.sort_order;
     });
   }, [materialized, filter, projectId, today]);
+  const timelineTasks = filter === "all" ? materialized : visibleTasks;
   const toggle = (task: Task) => {
     if (task.recurrence_template_id && task.occurrence_on && onCompleteRecurring) {
       void Promise.resolve(onCompleteRecurring(task, task.status !== "done")).catch(() => {});
@@ -776,7 +814,7 @@ export function TaskWorkspace({
         </div>
         <div className="inline-tools">
           <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
-          <button className="primary" onClick={() => setTaskEditor(null)}>＋ 업무</button>
+          <button className="primary" onClick={() => { setNewTaskProjectId(""); setTaskEditor(null); }}>＋ 업무</button>
         </div>
       </div>
       <div className="work-filters">
@@ -797,39 +835,9 @@ export function TaskWorkspace({
             </button>
           ))}
         </div>
-        <div className="segmented">
-          {([
-            ["list", "목록"],
-            ["timeline", "타임라인"],
-            ["calendar", "캘린더"],
-          ] as const).map(([value, label]) => (
-            <button key={value} className={view === value ? "selected" : ""} onClick={() => setView(value)}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <small className="work-view-note">목록 · 타임라인 · 캘린더를 한 화면에서 봅니다.</small>
       </div>
       <div className="work-layout">
-        <aside className="work-project-list panel">
-          <div className="section-toolbar">
-            <h2>프로젝트</h2>
-            <button aria-label="프로젝트 추가" onClick={() => setProjectEditor(null)}>＋</button>
-          </div>
-          <button className={!projectId ? "selected project-filter" : "project-filter"} onClick={() => { setProjectId(""); setFilter("projects"); }}>
-            전체 프로젝트
-          </button>
-          {projects.map((project) => (
-            <button
-              key={project.id}
-              className={projectId === project.id ? "selected project-filter" : "project-filter"}
-              onClick={() => { setProjectId(project.id); setFilter("projects"); }}
-            >
-              <strong>{project.name}</strong>
-              <small>{number(data.tasks.filter((task) => !task.deleted_at && task.project_id === project.id && task.status !== "done").length)}건 진행</small>
-            </button>
-          ))}
-          {!projects.length && <p className="empty-small">프로젝트를 추가해 보세요.</p>}
-        </aside>
         <main className="work-main">
           {filter === "projects" && currentProject && (
             <section className="project-header panel">
@@ -852,48 +860,111 @@ export function TaskWorkspace({
               onDelete={onDelete}
             />
           )}
-          {view === "list" && (
-            <section className="task-list panel">
+          <div className="work-overview-grid">
+            <section className="task-list task-tree panel">
               <div className="section-toolbar">
                 <div>
-                  <h2>{filter === "today" ? "오늘 해야 할 일" : filter === "requested" ? "요청받은 업무" : filter === "recurring" ? "반복 업무" : "업무 목록"}</h2>
+                  <h2>프로젝트 업무 목록</h2>
                   <small>{visibleTasks.length}건</small>
                 </div>
-                <button onClick={() => setTaskEditor(null)}>＋ 업무</button>
+                <div className="inline-tools">
+                  <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
+                  <button onClick={() => { setNewTaskProjectId(""); setTaskEditor(null); }}>＋ 업무</button>
+                </div>
               </div>
-              {visibleTasks.length ? visibleTasks.map((task) => (
-                <TaskRow key={task.id} task={task} data={data} today={today} onToggle={toggle} onEdit={(item) => setTaskEditor(item)} />
-              )) : <div className="empty-small">표시할 업무가 없습니다.</div>}
+              {projects.map((project) => {
+                const tasks = visibleTasks.filter((task) => task.project_id === project.id);
+                const collapsed = collapsedProjects.has(project.id);
+                const total = materialized.filter((task) => task.project_id === project.id).length;
+                const done = materialized.filter((task) => task.project_id === project.id && task.status === "done").length;
+                return (
+                  <div className="project-group" key={project.id}>
+                    <div className="project-tree-heading">
+                      <button
+                        className="project-tree-title"
+                        aria-expanded={!collapsed}
+                        onClick={() => setCollapsedProjects((current) => {
+                          const next = new Set(current);
+                          if (next.has(project.id)) next.delete(project.id); else next.add(project.id);
+                          return next;
+                        })}
+                      >
+                        <span className="project-disclosure">{collapsed ? "▸" : "▾"}</span>
+                        <strong>{project.name}</strong>
+                        <small>{done}/{total} 완료 · {project.start_on ?? "시작일 미정"} → {project.due_on ?? "목표일 미정"}</small>
+                      </button>
+                      <div className="project-tree-actions">
+                        <button aria-label={`${project.name} 업무 추가`} onClick={() => { setNewTaskProjectId(project.id); setTaskEditor(null); }}>＋ 업무</button>
+                        <button aria-label={`${project.name} 수정`} onClick={() => setProjectEditor(project)}>⋯</button>
+                      </div>
+                    </div>
+                    {!collapsed && (tasks.length ? tasks.map((task) => (
+                      <TaskRow key={task.id} task={task} data={data} today={today} onToggle={toggle} onEdit={(item) => setTaskEditor(item)} />
+                    )) : <p className="project-tree-empty">{filter === "all" ? "하위 업무가 없습니다." : "현재 필터에 해당하는 업무가 없습니다."}</p>)}
+                  </div>
+                );
+              })}
+              {(() => {
+                const tasks = visibleTasks.filter((task) => !task.project_id);
+                const collapsed = collapsedProjects.has("__unassigned__");
+                if (!tasks.length && projects.length) return null;
+                return (
+                  <div className="project-group unassigned-group">
+                    <div className="project-tree-heading">
+                      <button className="project-tree-title" aria-expanded={!collapsed} onClick={() => setCollapsedProjects((current) => {
+                        const next = new Set(current);
+                        if (next.has("__unassigned__")) next.delete("__unassigned__"); else next.add("__unassigned__");
+                        return next;
+                      })}>
+                        <span className="project-disclosure">{collapsed ? "▸" : "▾"}</span><strong>미분류 업무</strong><small>{tasks.length}건</small>
+                      </button>
+                    </div>
+                    {!collapsed && (tasks.length ? tasks.map((task) => (
+                      <TaskRow key={task.id} task={task} data={data} today={today} onToggle={toggle} onEdit={(item) => setTaskEditor(item)} />
+                    )) : <p className="project-tree-empty">미분류 업무가 없습니다.</p>)}
+                  </div>
+                );
+              })()}
+              {!projects.length && !visibleTasks.length && <div className="empty-small">프로젝트 또는 업무를 추가해 보세요.</div>}
             </section>
-          )}
-          {view === "timeline" && (
             <section className="task-timeline panel">
               <div className="section-toolbar"><h2>프로젝트 타임라인</h2><small>{today} 기준</small></div>
               {projects.length ? projects.map((project) => {
-                const tasks = materialized.filter((task) => task.project_id === project.id);
-                return <button className="timeline-project" key={project.id} onClick={() => { setProjectId(project.id); setFilter("projects"); }}>
-                  <span><strong>{project.name}</strong><small>{project.start_on ?? "시작일 미정"} → {project.due_on ?? "목표일 미정"}</small></span>
-                  <i><b style={{ width: `${Math.max(12, Math.min(100, tasks.length ? (tasks.filter((task) => task.status === "done").length / tasks.length) * 100 : 0))}%` }} /></i>
-                  <em>{tasks.filter((task) => task.status === "done").length}/{tasks.length}</em>
-                </button>;
+                const tasks = timelineTasks.filter((task) => task.project_id === project.id);
+                const allProjectTasks = materialized.filter((task) => task.project_id === project.id);
+                const done = allProjectTasks.filter((task) => task.status === "done").length;
+                return (
+                  <div className="timeline-project" key={project.id}>
+                    <button className="timeline-project-head" onClick={() => { setProjectId(project.id); setFilter("projects"); }}>
+                      <span><strong>{project.name}</strong><small>{project.start_on ?? "시작일 미정"} → {project.due_on ?? "목표일 미정"}</small></span>
+                      <i><b style={{ width: `${Math.max(12, Math.min(100, allProjectTasks.length ? (done / allProjectTasks.length) * 100 : 0))}%` }} /></i>
+                      <em>{done}/{allProjectTasks.length}</em>
+                    </button>
+                    {tasks.slice(0, 8).map((task) => (
+                      <button className="timeline-task" key={task.id} onClick={() => setTaskEditor(task)}>
+                        <span>{task.status === "done" ? "✓" : "○"} {task.title}</span>
+                        <small>{compactDate(task.start_at)} → {compactDate(task.due_at)}</small>
+                      </button>
+                    ))}
+                    {tasks.length > 8 && <small className="timeline-more">+ {tasks.length - 8}건</small>}
+                  </div>
+                );
               }) : <div className="empty-small">프로젝트를 추가해 보세요.</div>}
             </section>
-          )}
-          {view === "calendar" && (
-            <section className="task-calendar panel">
-              <div className="section-toolbar"><h2>{today.slice(0, 7).replace("-", "년 ")}월 업무 캘린더</h2><small>오늘 {today.slice(5).replace("-", "/")}</small></div>
-              <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
-              <div className="calendar-grid">
-                {calendarDays.map((day) => <div className={day === today ? "calendar-day today" : "calendar-day"} key={day}>
-                  <b>{Number(day.slice(-2))}</b>
-                  {(calendarTasks.get(day) ?? []).slice(0, 3).map((task) => <button key={task.id} onClick={() => setTaskEditor(task)}>{task.title}</button>)}
-                </div>)}
-              </div>
-            </section>
-          )}
+          </div>
+          <section className="task-calendar panel">
+            <div className="section-toolbar"><h2>{today.slice(0, 7).replace("-", "년 ")}월 업무 캘린더</h2><small>오늘 {today.slice(5).replace("-", "/")}</small></div>
+            <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
+            <div className="calendar-grid">
+              {calendarDays.map((day) => <div className={day === today ? "calendar-day today" : "calendar-day"} key={day}>
+                <b>{Number(day.slice(-2))}</b>
+                {(calendarTasks.get(day) ?? []).slice(0, 3).map((task) => <button key={task.id} onClick={() => setTaskEditor(task)}>{task.title}</button>)}
+              </div>)}
+            </div>
+          </section>
         </main>
       </div>
-      {taskEditor !== undefined && <TaskForm data={data} today={today} task={taskEditor} onSave={onSave} onArchive={(task) => onUpdate("tasks", task.id, { deleted_at: new Date().toISOString() })} onClose={() => setTaskEditor(undefined)} />}
+      {taskEditor !== undefined && <TaskForm data={data} today={today} task={taskEditor} initialProjectId={taskEditor ? "" : newTaskProjectId} onSave={onSave} onArchive={(task) => onUpdate("tasks", task.id, { deleted_at: new Date().toISOString() })} onClose={() => setTaskEditor(undefined)} />}
       {projectEditor !== undefined && <ProjectForm data={data} project={projectEditor} onSave={onSave} onClose={() => setProjectEditor(undefined)} />}
     </div>
   );

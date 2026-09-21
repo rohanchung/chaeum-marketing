@@ -187,6 +187,7 @@ export type Task = Base & {
   due_at: string | null;
   remind_at: string | null;
   completed_at: string | null;
+  depends_on_task_id: string | null;
   sort_order: number;
   created_at?: string;
   updated_at?: string;
