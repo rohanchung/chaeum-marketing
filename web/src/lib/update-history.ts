@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260922-calendar-lanes-events",
+    date: "2026-09-22",
+    title: "캘린더 날짜별 줄 배치와 이벤트 우선 표시",
+    room: "현재 제작방",
+    changes: [
+      "같은 주라도 날짜 구간이 겹치지 않는 업무는 최상단 줄을 다시 사용하도록 캘린더 바 배치를 고쳤습니다.",
+      "이벤트를 업무·프로젝트보다 먼저 배치해 해당 날짜 칸의 맨 위에서 확인할 수 있게 했습니다.",
+      "날짜 숫자 아래 고정 여백과 일정 바 간격을 줄여 캘린더 상단에 더 촘촘하게 표시합니다.",
+    ],
+  },
+  {
     id: "20260922-task-wheel-and-2l",
     date: "2026-09-22",
     title: "캘린더 휠 월 전환과 업무 2L 통합",

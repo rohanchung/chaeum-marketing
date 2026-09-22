@@ -887,11 +887,32 @@ export function TaskWorkspace({
         label: segmentStart === rangeStart ? task.title : `↳ ${task.title}`,
       }];
     });
-    const bars = [...projectBars, ...eventBars, ...taskBars];
-    const sortedBars = bars
-      .sort((a, b) => a.startColumn - b.startColumn || a.kind.localeCompare(b.kind) || a.endColumn - b.endColumn)
-      .map((bar, index) => ({ ...bar, lane: index }));
-    return { week, bars: sortedBars };
+    const priority = { event: 0, task: 1, project: 2 } as const;
+    const bars = [...projectBars, ...eventBars, ...taskBars]
+      .sort((a, b) =>
+        priority[a.kind] - priority[b.kind] ||
+        a.startColumn - b.startColumn ||
+        a.endColumn - b.endColumn,
+      );
+    const lanes: Array<Array<{ startColumn: number; endColumn: number }>> = [];
+    const positionedBars = bars.map((bar) => {
+      let lane = lanes.findIndex((items) =>
+        items.every(
+          (item) =>
+            item.endColumn <= bar.startColumn || item.startColumn >= bar.endColumn,
+        ),
+      );
+      if (lane < 0) {
+        lane = lanes.length;
+        lanes.push([]);
+      }
+      lanes[lane].push({
+        startColumn: bar.startColumn,
+        endColumn: bar.endColumn,
+      });
+      return { ...bar, lane };
+    });
+    return { week, bars: positionedBars, laneCount: Math.max(1, lanes.length) };
   });
   const dailyTasks = (calendarTasks.get(selectedDate) ?? []).filter(
     (task, index, tasks) => tasks.findIndex((item) => item.id === task.id) === index,
@@ -966,8 +987,8 @@ export function TaskWorkspace({
               <div className="section-toolbar"><h2>{month.replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 사이 업무 흐름 포함 · 오늘 {today.slice(5).replace("-", "/")}</small></div>
               <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
               <div className="calendar-grid" onWheel={handleCalendarWheel}>
-                {calendarWeeks.map(({ week, bars }, weekIndex) => (
-                  <div className="calendar-week" key={`week-${weekIndex}`} style={{ minHeight: `${Math.max(112, 48 + bars.length * 22)}px` }}>
+                {calendarWeeks.map(({ week, bars, laneCount }, weekIndex) => (
+                  <div className="calendar-week" key={`week-${weekIndex}`} style={{ minHeight: `${Math.max(96, 21 + laneCount * 19)}px` }}>
                     <div className="calendar-days">
                       {week.map((day, index) => <div className={`${!day ? "calendar-day empty" : day === today ? "calendar-day today" : day === selectedDate ? "calendar-day selected" : "calendar-day"}${day && dragOverDate === day ? " drag-over" : ""}`} key={day ?? `empty-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)} onDragOver={(event) => { if (day && draggedTaskId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDragOverDate(day); } }} onDragLeave={() => day && dragOverDate === day && setDragOverDate(null)} onDrop={(event) => { if (!day) return; event.preventDefault(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; if (taskId) moveTaskToDate(taskId, day); }}>
                         {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>
@@ -986,7 +1007,7 @@ export function TaskWorkspace({
                           className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}${bar.kind === "event" ? " calendar-event-bar" : ""}${bar.kind === "task" && bar.task.status === "done" ? " done" : ""}`}
                           key={`${bar.kind}:${bar.kind === "project" ? bar.project.id : bar.kind === "event" ? bar.event.id : bar.task.id}:${weekIndex}`}
                           draggable={draggable}
-                          style={{ left: `${((bar.startColumn - 1) / 7) * 100}%`, width: `calc(${((bar.endColumn - bar.startColumn) / 7) * 100}% - 4px)`, top: `${42 + bar.lane * 22}px`, backgroundColor: color, color: readableOnColor(color) }}
+                          style={{ left: `${((bar.startColumn - 1) / 7) * 100}%`, width: `calc(${((bar.endColumn - bar.startColumn) / 7) * 100}% - 4px)`, top: `${18 + bar.lane * 19}px`, backgroundColor: color, color: readableOnColor(color) }}
                           title={`${bar.label}${project ? ` · ${project.name}` : event ? ` · ${event.location ?? "이벤트"}` : ""}`}
                           onDragStart={(dragEvent) => { if (!draggable || !task) return; dragEvent.dataTransfer.effectAllowed = "move"; dragEvent.dataTransfer.setData("text/plain", task.id); setDraggedTaskId(task.id); }}
                           onDragEnd={() => { setDraggedTaskId(null); setDragOverDate(null); }}
