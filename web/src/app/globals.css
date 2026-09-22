@@ -2822,11 +2822,114 @@ textarea {
   font-size: 9px !important;
 }
 .calendar-main .calendar-grid {
-  max-height: calc(100vh - 275px);
-  min-height: 220px;
+  height: calc(100vh - 245px);
+  max-height: none;
+  min-height: 360px;
   overflow-y: auto;
   overscroll-behavior: contain;
   align-content: start;
+}
+.work-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0 0 6px;
+}
+.work-filters .segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.work-filters .segmented button {
+  padding: 4px 7px;
+  font-size: 10px;
+}
+.work-filters .segmented .project-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.project-filter i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.task-sync-status {
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.calendar-week {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 112px;
+}
+.calendar-main .calendar-grid {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+}
+.calendar-days,
+.calendar-week-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.calendar-days {
+  position: relative;
+  z-index: 1;
+  min-height: 112px;
+  height: 100%;
+}
+.calendar-week-bars {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  min-height: 100%;
+  pointer-events: none;
+}
+.calendar-week-bars .calendar-task-bar {
+  position: absolute;
+  width: calc(100% - 4px);
+  min-width: 0;
+  margin: 0 2px;
+  overflow: hidden;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  box-shadow: 0 1px 2px rgb(26 64 43 / 12%);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 650;
+  pointer-events: auto;
+}
+.calendar-day.selected {
+  box-shadow: inset 0 0 0 2px #78ad87;
+}
+.color-input-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.color-input-row input[type="color"] {
+  width: 34px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #dbe6dd;
+  border-radius: 5px;
+  background: transparent;
+}
+.color-input-row code {
+  color: #4c6355;
+  font-size: 10px;
+}
+.color-input-row small {
+  color: var(--muted);
+  font-size: 9px;
 }
 @media (max-width: 760px) {
   .task-2l {
@@ -2837,5 +2940,13 @@ textarea {
     width: 100%;
     justify-content: flex-start;
     overflow-x: auto;
+  }
+  .calendar-main .calendar-grid {
+    height: 520px;
+    min-height: 360px;
+  }
+  .work-filters {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

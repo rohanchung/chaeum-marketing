@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260922-task-calendar-bars-filters",
+    date: "2026-09-22",
+    title: "업무 캘린더 연속 바·필터·프로젝트 색상",
+    room: "현재 제작방",
+    changes: [
+      "업무 2L 아래 필터 바에 프로젝트별 필터와 최신 저장 시각을 배치하고, 오늘·요청·반복·프로젝트 필터를 복수 선택할 수 있게 했습니다.",
+      "기간 업무를 주 단위 연속 색상 바로 표시하고, 프로젝트 색상 선택을 업무 바에 연결했습니다.",
+      "캘린더를 화면 높이에 맞춰 확장하고 업무·프로젝트 모달의 ESC 취소와 Enter 저장 흐름을 정리했습니다.",
+    ],
+  },
+  {
     id: "20260922-task-calendar-2l",
     date: "2026-09-22",
     title: "업무 2L·한국 시각·캘린더 날짜 업무 흐름",

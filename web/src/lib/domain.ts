@@ -152,6 +152,7 @@ export type WorkProject = Base & {
   area_id: string;
   name: string;
   description: string | null;
+  color: string | null;
   status: "active" | "completed" | "paused";
   priority: "low" | "normal" | "high";
   start_on: string | null;

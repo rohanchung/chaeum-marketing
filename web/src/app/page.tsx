@@ -65,6 +65,14 @@ import { nextTaskOccurrence } from "@/lib/task-recurrence";
 
 const tabs = ["대시보드", "업무", "콘텐츠", "이벤트", "구매", "분석", "리포트", "로그"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
+const koreanClock = (value: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
 export default function Home() {
   const [workspace, setWorkspace] = useState<string | null>(null);
   const { today, now: serverNow, synced: clockSynced } = useServerDate(!!workspace);
@@ -82,6 +90,7 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(0);
   const [ready, setReady] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [analysisTab, setAnalysisTab] = useState("성과");
   const [lifecycle, setLifecycle] = useState("active");
   const [search, setSearch] = useState("");
@@ -101,6 +110,19 @@ export default function Home() {
     window.addEventListener("popstate", closeOverlays);
     return () => window.removeEventListener("popstate", closeOverlays);
   }, []);
+  useEffect(() => {
+    if (!editor && !detail && !eventDate && !selectedReport) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setEditor(null);
+      setDetail(null);
+      setEventDate(null);
+      setSelectedReport(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editor, detail, eventDate, selectedReport]);
   useEffect(() => {
     if (clockSynced && !clockInitialized.current) {
       clockInitialized.current = true;
@@ -261,6 +283,7 @@ export default function Home() {
       else if (collection === "events") await saveEvent(workspace, record);
       else await saveRecord(workspace, collection, record);
       await refresh(workspace);
+      setLastSavedAt(serverNow);
       setNotice("저장했습니다.");
     });
   }
@@ -310,6 +333,7 @@ export default function Home() {
         });
         await saveCells(workspace, changes);
         await refresh(workspace);
+        setLastSavedAt(serverNow);
         setUndo(before);
         setNotice(`${changes.length}개 셀 저장됨`);
       });
@@ -352,6 +376,7 @@ export default function Home() {
         completed_at: next === null ? serverNow : null,
       });
       await refresh(workspace);
+      setLastSavedAt(serverNow);
       setNotice(completed ? "반복 업무를 완료하고 다음 일정을 만들었습니다." : "반복 업무를 되돌렸습니다.");
     });
   }
@@ -363,6 +388,7 @@ export default function Home() {
     fire(async () => {
       await updateRecord(workspace!, collection, id, patch);
       await refresh(workspace!);
+      setLastSavedAt(serverNow);
       setNotice(
         patch.deleted_at ? "휴지통으로 이동했습니다." : "변경했습니다.",
       );
@@ -533,16 +559,16 @@ export default function Home() {
       </header>
       <div className="workspace">
         <div className="toolbar">
-          <div className="status" role="status">
-            <i className={error ? "error" : busy ? "pending" : ""} />
-            {busy
-              ? "저장·조회 중…"
-              : error
-                ? "확인 필요"
-                : ready
-                  ? "저장된 기록과 동기화됨"
-                  : "데이터 확인 필요"}
-          </div>
+          {nav !== "업무" && <div className="status" role="status">
+              <i className={error ? "error" : busy ? "pending" : ""} />
+              {busy
+                ? "저장·조회 중…"
+                : error
+                  ? "확인 필요"
+                  : ready
+                    ? "저장된 기록과 동기화됨"
+                    : "데이터 확인 필요"}
+            </div>}
           {nav !== "로그" && nav !== "업무" && (
             <div className="toolbar-controls">
               {nav !== "대시보드" && nav !== "업무" && (
@@ -744,6 +770,7 @@ export default function Home() {
                 data={data}
                 today={today}
                 serverNow={serverNow}
+                syncLabel={busy ? "저장·조회 중…" : error ? "확인 필요" : ready ? `저장된 기록과 동기화됨 · ${koreanClock(lastSavedAt ?? serverNow)}` : "데이터 확인 필요"}
                 month={month}
                 onMonthChange={setMonth}
                 onSave={(collection, record) => mutate(collection, record)}

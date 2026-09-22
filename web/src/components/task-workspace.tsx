@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   Data,
   Task,
@@ -66,6 +66,25 @@ const koreanClock = (value: string) =>
   }).format(new Date(value));
 const activeTask = (task: Task) =>
   !task.deleted_at && task.status !== "done" && task.status !== "cancelled";
+const useModalEscape = (onClose: () => void) => {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+};
+const projectColor = (project: WorkProject | undefined) => project?.color ?? "#4e986e";
+const readableOnColor = (color: string) => {
+  const match = color.match(/^#([0-9a-f]{6})$/i);
+  if (!match) return "#ffffff";
+  const [r, g, b] = [0, 2, 4].map((offset) => Number.parseInt(match[1].slice(offset, offset + 2), 16));
+  return (r * 299 + g * 587 + b * 114) / 1000 > 155 ? "#18352a" : "#ffffff";
+};
 
 export function materializedTasks(data: Data, today: string): Task[] {
   const occurrences = new Map(
@@ -263,6 +282,7 @@ export function TaskForm({
   onArchive: (task: Task) => void;
   onClose: () => void;
 }) {
+  useModalEscape(onClose);
   const initialProject = task?.project_id ?? initialProjectId;
   const [title, setTitle] = useState(task?.title ?? "");
   const [projectId, setProjectId] = useState(initialProject);
@@ -507,12 +527,14 @@ function ProjectForm({
   onSave: Save;
   onClose: () => void;
 }) {
+  useModalEscape(onClose);
   const [name, setName] = useState(project?.name ?? "");
   const [areaId, setAreaId] = useState(project?.area_id ?? data.workAreas.find((area) => !area.deleted_at)?.id ?? "");
   const [status, setStatus] = useState(project?.status ?? "active");
   const [priority, setPriority] = useState(project?.priority ?? "normal");
   const [startOn, setStartOn] = useState(project?.start_on ?? "");
   const [dueOn, setDueOn] = useState(project?.due_on ?? "");
+  const [color, setColor] = useState(project?.color ?? "#4e986e");
   const [description, setDescription] = useState(project?.description ?? "");
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -522,6 +544,7 @@ function ProjectForm({
       area_id: areaId,
       name: name.trim(),
       description: description.trim() || null,
+      color,
       status,
       priority,
       start_on: startOn || null,
@@ -586,6 +609,14 @@ function ProjectForm({
             </select>
           </label>
         </div>
+        <label className="form-field color-field">
+          <span>캘린더 색상</span>
+          <div className="color-input-row">
+            <input type="color" value={color} onChange={(event) => setColor(event.target.value)} aria-label="프로젝트 캘린더 색상" />
+            <code>{color.toUpperCase()}</code>
+            <small>이 프로젝트에 연결된 업무 바에 적용됩니다.</small>
+          </div>
+        </label>
         <label className="form-field">
           <span>설명</span>
           <textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} />
@@ -665,6 +696,7 @@ export function TaskWorkspace({
   data,
   today,
   serverNow,
+  syncLabel,
   month,
   onMonthChange,
   onSave,
@@ -675,6 +707,7 @@ export function TaskWorkspace({
   data: Data;
   today: string;
   serverNow: string;
+  syncLabel: string;
   month: string;
   onMonthChange: (month: string) => void;
   onSave: Save;
@@ -682,7 +715,8 @@ export function TaskWorkspace({
   initialCreate?: boolean;
   onCompleteRecurring?: (task: Task, completed: boolean) => void | Promise<void>;
 }) {
-  const [filter, setFilter] = useState<"today" | "all" | "requested" | "recurring">("all");
+  const [filters, setFilters] = useState<Array<"today" | "requested" | "recurring">>([]);
+  const [projectFilters, setProjectFilters] = useState<string[]>([]);
   const [taskEditor, setTaskEditor] = useState<Task | null | undefined>(initialCreate ? null : undefined);
   const [newTaskProjectId, setNewTaskProjectId] = useState("");
   const [newTaskDate, setNewTaskDate] = useState("");
@@ -693,19 +727,19 @@ export function TaskWorkspace({
     [data, today],
   );
   const visibleTasks = useMemo(() => {
-    let tasks = [...materialized];
-    if (filter === "today") {
-      tasks = tasks.filter((task) => {
-        const start = dateOnly(task.start_at);
-        const due = dateOnly(task.due_at);
-        return task.status !== "done" && task.status !== "cancelled" &&
-          (start === today || due === today || (due !== null && due < today));
-      });
-    } else if (filter === "requested") {
-      tasks = tasks.filter((task) => task.source_type === "requested" && task.status !== "cancelled");
-    } else if (filter === "recurring") {
-      tasks = tasks.filter((task) => task.source_type === "recurring" && task.status !== "cancelled");
-    }
+    const hasFilters = filters.length > 0 || projectFilters.length > 0;
+    const tasks = hasFilters
+      ? materialized.filter((task) => projectFilters.includes(task.project_id ?? "") || filters.some((filter) => {
+          if (filter === "today") {
+            const start = dateOnly(task.start_at);
+            const due = dateOnly(task.due_at);
+            return task.status !== "done" && task.status !== "cancelled" &&
+              (start === today || due === today || (due !== null && due < today));
+          }
+          if (filter === "requested") return task.source_type === "requested" && task.status !== "cancelled";
+          return task.source_type === "recurring" && task.status !== "cancelled";
+        }))
+      : [...materialized];
     return tasks.sort((a, b) => {
       const aDone = a.status === "done" ? 1 : 0;
       const bDone = b.status === "done" ? 1 : 0;
@@ -713,7 +747,7 @@ export function TaskWorkspace({
       const bDue = dateOnly(b.due_at) ?? "9999-12-31";
       return aDone - bDone || aDue.localeCompare(bDue) || a.sort_order - b.sort_order;
     });
-  }, [materialized, filter, today]);
+  }, [materialized, filters, projectFilters, today]);
   const toggle = (task: Task) => {
     if (task.recurrence_template_id && task.occurrence_on && onCompleteRecurring) {
       void Promise.resolve(onCompleteRecurring(task, task.status !== "done")).catch(() => {});
@@ -762,9 +796,72 @@ export function TaskWorkspace({
       }
     }
   }
+  const calendarWeeks = Array.from({ length: calendarCells.length / 7 }, (_, weekIndex) => {
+    const week = calendarCells.slice(weekIndex * 7, weekIndex * 7 + 7);
+    const weekDays = week.filter((day): day is string => !!day);
+    const weekStart = weekDays[0];
+    const weekEnd = weekDays[weekDays.length - 1];
+    const showProjectBars = !filters.length || projectFilters.length > 0;
+    const projectBars = !weekStart || !weekEnd || !showProjectBars ? [] : data.workProjects
+      .filter((project) => !project.deleted_at && project.start_on && project.due_on && (!projectFilters.length || projectFilters.includes(project.id)))
+      .flatMap((project) => {
+        const rangeStart = project.start_on! <= project.due_on! ? project.start_on! : project.due_on!;
+        const rangeEnd = project.start_on! <= project.due_on! ? project.due_on! : project.start_on!;
+        if (rangeEnd < weekStart || rangeStart > weekEnd) return [];
+        const segmentStart = rangeStart < weekStart ? weekStart : rangeStart;
+        const segmentEnd = rangeEnd > weekEnd ? weekEnd : rangeEnd;
+        const startColumn = week.findIndex((day) => day === segmentStart) + 1;
+        const endColumn = week.findIndex((day) => day === segmentEnd) + 2;
+        if (startColumn < 1 || endColumn <= startColumn) return [];
+        return [{
+          kind: "project" as const,
+          project,
+          startColumn,
+          endColumn,
+          lane: 0,
+          label: segmentStart === rangeStart ? project.name : `↳ ${project.name}`,
+        }];
+      });
+    const taskBars = !weekStart || !weekEnd ? [] : visibleTasks.flatMap((task) => {
+      const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
+      const due = dateOnly(task.due_at) ?? start;
+      if (!start || !due) return [];
+      const rangeStart = start <= due ? start : due;
+      const rangeEnd = start <= due ? due : start;
+      if (rangeEnd < weekStart || rangeStart > weekEnd) return [];
+      const segmentStart = rangeStart < weekStart ? weekStart : rangeStart;
+      const segmentEnd = rangeEnd > weekEnd ? weekEnd : rangeEnd;
+      const startColumn = week.findIndex((day) => day === segmentStart) + 1;
+      const endColumn = week.findIndex((day) => day === segmentEnd) + 2;
+      if (startColumn < 1 || endColumn <= startColumn) return [];
+      return [{
+        kind: "task" as const,
+        task,
+        startColumn,
+        endColumn,
+        lane: 0,
+        label: segmentStart === rangeStart ? task.title : `↳ ${task.title}`,
+      }];
+    });
+    const bars = [...projectBars, ...taskBars];
+    const sortedBars = bars
+      .sort((a, b) => a.startColumn - b.startColumn || a.kind.localeCompare(b.kind) || a.endColumn - b.endColumn)
+      .map((bar, index) => ({ ...bar, lane: index }));
+    return { week, bars: sortedBars };
+  });
   const dailyTasks = (calendarTasks.get(selectedDate) ?? []).filter(
     (task, index, tasks) => tasks.findIndex((item) => item.id === task.id) === index,
   );
+  const toggleFilter = (value: "today" | "requested" | "recurring") => {
+    setFilters((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+  };
+  const toggleProjectFilter = (projectId: string) => {
+    setProjectFilters((current) => current.includes(projectId) ? current.filter((item) => item !== projectId) : [...current, projectId]);
+  };
+  const resetFilters = () => {
+    setFilters([]);
+    setProjectFilters([]);
+  };
   return (
     <div className="work-page">
       <div className="task-2l">
@@ -775,7 +872,6 @@ export function TaskWorkspace({
           <button aria-label="다음 달" onClick={() => moveCalendarMonth(1)}>›</button>
           <button onClick={() => setCalendarMonth(today.slice(0, 7))}>오늘 {today.slice(5).replace("-", "/")}</button>
           <span className="task-clock">한국 {koreanClock(serverNow)}</span>
-          <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
           <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(""); setTaskEditor(null); }}>＋ 업무</button>
         </div>
       </div>
@@ -789,13 +885,25 @@ export function TaskWorkspace({
           ] as const).map(([value, label]) => (
             <button
               key={value}
-              className={filter === value ? "selected" : ""}
-              onClick={() => setFilter(value)}
+              className={value === "all" ? (!filters.length && !projectFilters.length ? "selected" : "") : filters.includes(value) ? "selected" : ""}
+              onClick={() => value === "all" ? resetFilters() : toggleFilter(value)}
             >
               {label}
             </button>
           ))}
+          {data.workProjects.filter((project) => !project.deleted_at).sort((a, b) => a.sort_order - b.sort_order).map((project) => (
+            <button
+              key={project.id}
+              className={projectFilters.includes(project.id) ? "selected project-filter" : "project-filter"}
+              onClick={() => toggleProjectFilter(project.id)}
+              title={`프로젝트 필터 · ${project.name}`}
+            >
+              <i style={{ backgroundColor: projectColor(project) }} />{project.name}
+            </button>
+          ))}
+          <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
         </div>
+        <span className="task-sync-status" role="status">{syncLabel}</span>
       </div>
       <div className="work-layout">
         <main className="work-main">
@@ -804,19 +912,33 @@ export function TaskWorkspace({
               <div className="section-toolbar"><h2>{month.replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 사이 업무 흐름 포함 · 오늘 {today.slice(5).replace("-", "/")}</small></div>
               <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
               <div className="calendar-grid">
-                {calendarCells.map((day, index) => <div className={!day ? "calendar-day empty" : day === today ? "calendar-day today" : "calendar-day"} key={day ?? `empty-${index}`} onClick={() => day && selectCalendarDate(day)}>
-                  {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>
-                    <b>{Number(day.slice(-2))}</b><span>＋</span>
-                  </button>}
-                  {day && (calendarTasks.get(day) ?? []).slice(0, 4).map((task) => {
-                    const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
-                    const continues = start !== day;
-                    return <button className={`calendar-task${continues ? " continues" : ""}`} key={`${task.id}:${day}`} onClick={(event) => { event.stopPropagation(); setTaskEditor(task); }}>
-                      {continues ? `↳ ${task.title}` : task.title}
-                    </button>;
-                  })}
-                  {day && (calendarTasks.get(day) ?? []).length > 4 && <small className="calendar-more">+ {(calendarTasks.get(day) ?? []).length - 4}건</small>}
-                </div>)}
+                {calendarWeeks.map(({ week, bars }, weekIndex) => (
+                  <div className="calendar-week" key={`week-${weekIndex}`} style={{ minHeight: `${Math.max(112, 48 + bars.length * 22)}px` }}>
+                    <div className="calendar-days">
+                      {week.map((day, index) => <div className={!day ? "calendar-day empty" : day === today ? "calendar-day today" : day === selectedDate ? "calendar-day selected" : "calendar-day"} key={day ?? `empty-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)}>
+                        {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>
+                          <b>{Number(day.slice(-2))}</b><span>＋</span>
+                        </button>}
+                      </div>)}
+                    </div>
+                    <div className="calendar-week-bars" aria-label="프로젝트 업무 흐름">
+                      {bars.map((bar) => {
+                        const task = bar.kind === "task" ? bar.task : undefined;
+                        const project = bar.kind === "project" ? bar.project : task ? data.workProjects.find((item) => item.id === task.project_id) : undefined;
+                        const color = projectColor(project);
+                        return <button
+                          className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}`}
+                          key={`${bar.kind}:${bar.kind === "project" ? bar.project.id : bar.task.id}:${weekIndex}`}
+                          style={{ gridColumn: `${bar.startColumn} / ${bar.endColumn}`, top: `${42 + bar.lane * 22}px`, backgroundColor: color, color: readableOnColor(color) }}
+                          title={`${bar.label}${project ? ` · ${project.name}` : ""}`}
+                          onClick={(event) => { event.stopPropagation(); if (task) setTaskEditor(task); else if (project) setProjectEditor(project); }}
+                        >
+                          {bar.label}
+                        </button>;
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
             <section className="task-list task-tree panel">
