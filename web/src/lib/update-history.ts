@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260922-task-complete-dnd",
+    date: "2026-09-22",
+    title: "업무 완료 표시와 캘린더 실행일 이동",
+    room: "현재 제작방",
+    changes: [
+      "완료 업무를 목록에서 아래로 재정렬하지 않고 같은 위치에 흐리게·취소선으로 표시합니다.",
+      "캘린더 업무 바를 날짜 칸으로 드래그해 실행 예정일을 이동할 수 있게 했습니다.",
+      "기간 업무는 기존 실행일과 마감일 사이 기간을 유지하고, 반복 업무·프로젝트·이벤트 바는 드래그 대상에서 제외했습니다.",
+    ],
+  },
+  {
     id: "20260922-event-sharing-workspace",
     date: "2026-09-22",
     title: "대시보드·업무 이벤트 공유",

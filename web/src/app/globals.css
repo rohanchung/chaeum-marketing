@@ -2912,6 +2912,34 @@ textarea {
   border: 1px solid rgb(255 255 255 / 35%);
   font-weight: 600;
 }
+.calendar-week-bars .calendar-task-bar[draggable="true"] {
+  cursor: grab;
+}
+.calendar-week-bars .calendar-task-bar[draggable="true"]:active {
+  cursor: grabbing;
+}
+.calendar-week-bars .calendar-task-bar.done {
+  opacity: .42;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.calendar-day.drag-over {
+  background: #e7f5e9 !important;
+  outline: 2px dashed #5b9d6f;
+  outline-offset: -3px;
+}
+.task-row.done {
+  opacity: .5;
+  filter: saturate(.65);
+}
+.task-row.done .task-row-main strong {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.task-row.done .task-status,
+.task-row.done .task-due {
+  color: #89988e;
+}
 .task-event-row {
   display: grid;
   grid-template-columns: 8px minmax(0, 1fr) auto;

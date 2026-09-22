@@ -86,6 +86,13 @@ const readableOnColor = (color: string) => {
   const [r, g, b] = [0, 2, 4].map((offset) => Number.parseInt(match[1].slice(offset, offset + 2), 16));
   return (r * 299 + g * 587 + b * 114) / 1000 > 155 ? "#18352a" : "#ffffff";
 };
+const dayDistance = (from: string, to: string) =>
+  Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000);
+const addDays = (value: string, amount: number) => {
+  const date = new Date(`${value}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
+};
 
 export function materializedTasks(data: Data, today: string): Task[] {
   const occurrences = new Map(
@@ -654,7 +661,7 @@ function TaskRow({
   const due = dateOnly(task.due_at);
   const overdue = due !== null && due < today && task.status !== "done";
   return (
-    <div className={`task-row${overdue ? " overdue" : ""}${dependencyBlocked ? " blocked" : ""}`}>
+    <div className={`task-row${overdue ? " overdue" : ""}${dependencyBlocked ? " blocked" : ""}${task.status === "done" ? " done" : ""}`}>
       <input
         type="checkbox"
         checked={task.status === "done"}
@@ -727,6 +734,8 @@ export function TaskWorkspace({
   const [newTaskDate, setNewTaskDate] = useState("");
   const [selectedDate, setSelectedDate] = useState(today);
   const [projectEditor, setProjectEditor] = useState<WorkProject | null | undefined>();
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const materialized = useMemo(
     () => materializedTasks(data, today),
     [data, today],
@@ -745,11 +754,9 @@ export function TaskWorkspace({
         }))
       : [...materialized];
     return tasks.sort((a, b) => {
-      const aDone = a.status === "done" ? 1 : 0;
-      const bDone = b.status === "done" ? 1 : 0;
       const aDue = dateOnly(a.due_at) ?? "9999-12-31";
       const bDue = dateOnly(b.due_at) ?? "9999-12-31";
-      return aDone - bDone || aDue.localeCompare(bDue) || a.sort_order - b.sort_order;
+      return aDue.localeCompare(bDue) || a.sort_order - b.sort_order;
     });
   }, [materialized, filters, today]);
   const toggle = (task: Task) => {
@@ -889,6 +896,22 @@ export function TaskWorkspace({
   const resetFilters = () => {
     setFilters([]);
   };
+  const moveTaskToDate = (taskId: string, targetDate: string) => {
+    const task = visibleTasks.find((item) => item.id === taskId) ?? materialized.find((item) => item.id === taskId);
+    if (!task || task.recurrence_template_id) return;
+    const start = dateOnly(task.start_at);
+    const due = dateOnly(task.due_at);
+    const duration = start && due ? Math.max(0, dayDistance(start, due)) : 0;
+    const nextDue = due ? addDays(targetDate, duration) : null;
+    onUpdate("tasks", task.id, {
+      start_at: timestamp(targetDate),
+      due_at: nextDue ? dueTimestamp(nextDue) : null,
+      updated_at: serverNow,
+    });
+    setSelectedDate(targetDate);
+    setDraggedTaskId(null);
+    setDragOverDate(null);
+  };
   return (
     <div className="work-page">
       <div className="task-2l">
@@ -935,7 +958,7 @@ export function TaskWorkspace({
                 {calendarWeeks.map(({ week, bars }, weekIndex) => (
                   <div className="calendar-week" key={`week-${weekIndex}`} style={{ minHeight: `${Math.max(112, 48 + bars.length * 22)}px` }}>
                     <div className="calendar-days">
-                      {week.map((day, index) => <div className={!day ? "calendar-day empty" : day === today ? "calendar-day today" : day === selectedDate ? "calendar-day selected" : "calendar-day"} key={day ?? `empty-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)}>
+                      {week.map((day, index) => <div className={`${!day ? "calendar-day empty" : day === today ? "calendar-day today" : day === selectedDate ? "calendar-day selected" : "calendar-day"}${day && dragOverDate === day ? " drag-over" : ""}`} key={day ?? `empty-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)} onDragOver={(event) => { if (day && draggedTaskId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDragOverDate(day); } }} onDragLeave={() => day && dragOverDate === day && setDragOverDate(null)} onDrop={(event) => { if (!day) return; event.preventDefault(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; if (taskId) moveTaskToDate(taskId, day); }}>
                         {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>
                           <b>{Number(day.slice(-2))}</b><span>＋</span>
                         </button>}
@@ -947,11 +970,15 @@ export function TaskWorkspace({
                         const project = bar.kind === "project" ? bar.project : task ? data.workProjects.find((item) => item.id === task.project_id) : undefined;
                         const event = bar.kind === "event" ? bar.event : undefined;
                         const color = event ? "#8b68b6" : projectColor(project);
+                        const draggable = bar.kind === "task" && !bar.task.recurrence_template_id;
                         return <button
-                          className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}${bar.kind === "event" ? " calendar-event-bar" : ""}`}
+                          className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}${bar.kind === "event" ? " calendar-event-bar" : ""}${bar.kind === "task" && bar.task.status === "done" ? " done" : ""}`}
                           key={`${bar.kind}:${bar.kind === "project" ? bar.project.id : bar.kind === "event" ? bar.event.id : bar.task.id}:${weekIndex}`}
+                          draggable={draggable}
                           style={{ gridColumn: `${bar.startColumn} / ${bar.endColumn}`, top: `${42 + bar.lane * 22}px`, backgroundColor: color, color: readableOnColor(color) }}
                           title={`${bar.label}${project ? ` · ${project.name}` : event ? ` · ${event.location ?? "이벤트"}` : ""}`}
+                          onDragStart={(dragEvent) => { if (!draggable || !task) return; dragEvent.dataTransfer.effectAllowed = "move"; dragEvent.dataTransfer.setData("text/plain", task.id); setDraggedTaskId(task.id); }}
+                          onDragEnd={() => { setDraggedTaskId(null); setDragOverDate(null); }}
                           onClick={(clickEvent) => { clickEvent.stopPropagation(); if (task) setTaskEditor(task); else if (project) setProjectEditor(project); else if (event) onEditEvent(event); }}
                         >
                           {bar.label}
