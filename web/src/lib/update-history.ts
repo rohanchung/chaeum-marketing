@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260922-task-calendar-position-refresh",
+    date: "2026-09-22",
+    title: "업무 추가 실시간 표시와 날짜 바 위치 수정",
+    room: "현재 제작방",
+    changes: [
+      "캘린더 연속 바에 날짜별 시작 위치와 기간 너비를 적용해 다른 날짜 업무가 같은 칸에 겹치던 문제를 수정했습니다.",
+      "업무를 추가·저장하면 새 업무가 저장된 날짜의 바와 오른쪽 목록에 즉시 재조회되어 표시됩니다.",
+      "여러 업무를 같은 날짜에 추가해도 개수 제한 없이 각 업무가 별도 줄로 표시되도록 정리했습니다.",
+    ],
+  },
+  {
     id: "20260922-task-complete-dnd",
     date: "2026-09-22",
     title: "업무 완료 표시와 캘린더 실행일 이동",

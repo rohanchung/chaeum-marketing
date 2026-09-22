@@ -975,7 +975,7 @@ export function TaskWorkspace({
                           className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}${bar.kind === "event" ? " calendar-event-bar" : ""}${bar.kind === "task" && bar.task.status === "done" ? " done" : ""}`}
                           key={`${bar.kind}:${bar.kind === "project" ? bar.project.id : bar.kind === "event" ? bar.event.id : bar.task.id}:${weekIndex}`}
                           draggable={draggable}
-                          style={{ gridColumn: `${bar.startColumn} / ${bar.endColumn}`, top: `${42 + bar.lane * 22}px`, backgroundColor: color, color: readableOnColor(color) }}
+                          style={{ left: `${((bar.startColumn - 1) / 7) * 100}%`, width: `calc(${((bar.endColumn - bar.startColumn) / 7) * 100}% - 4px)`, top: `${42 + bar.lane * 22}px`, backgroundColor: color, color: readableOnColor(color) }}
                           title={`${bar.label}${project ? ` · ${project.name}` : event ? ` · ${event.location ?? "이벤트"}` : ""}`}
                           onDragStart={(dragEvent) => { if (!draggable || !task) return; dragEvent.dataTransfer.effectAllowed = "move"; dragEvent.dataTransfer.setData("text/plain", task.id); setDraggedTaskId(task.id); }}
                           onDragEnd={() => { setDraggedTaskId(null); setDragOverDate(null); }}
