@@ -95,6 +95,7 @@ export function Editor({
   data,
   busy,
   onSave,
+  onArchive,
   onClose,
   today = localDate(),
 }: {
@@ -105,10 +106,12 @@ export function Editor({
     collection: Collection,
     record: Record<string, unknown>,
   ) => Promise<void>;
+  onArchive?: (collection: Collection, id: string) => void;
   onClose: () => void;
   today?: string;
 }) {
   const { collection, record: r = {} } = state;
+  const recordId = typeof r.id === "string" ? r.id : null;
   const keyword = r.content_type === "search_keyword";
   const hasMetricValues =
     collection === "metrics" && data.values.some((v) => v.metric_id === r.id);
@@ -1018,6 +1021,21 @@ export function Editor({
             </p>
           )}
           <footer>
+            {recordId && onArchive && (
+              <button
+                type="button"
+                className="danger-text"
+                disabled={busy}
+                onClick={() => {
+                  if (window.confirm("휴지통으로 이동할까요? 기록은 보존되며 복원할 수 있습니다.")) {
+                    onArchive(collection, recordId);
+                    onClose();
+                  }
+                }}
+              >
+                휴지통
+              </button>
+            )}
             <button type="button" disabled={busy} onClick={onClose}>
               취소
             </button>

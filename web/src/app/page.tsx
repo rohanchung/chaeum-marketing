@@ -1712,6 +1712,9 @@ export default function Home() {
           busy={!!busy}
           today={today}
           onSave={mutate}
+          onArchive={(collection, id) =>
+            changeState(collection, id, { deleted_at: serverNow })
+          }
           onClose={() => setEditor(null)}
         />
       )}

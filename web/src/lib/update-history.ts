@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260922-workspace-crud-audit",
+    date: "2026-09-22",
+    title: "업무·프로젝트·이벤트 삭제 흐름 보완",
+    room: "현재 제작방",
+    changes: [
+      "이벤트 수정창에 휴지통 동작을 추가해 업무 캘린더에서도 이벤트를 삭제할 수 있게 했습니다.",
+      "프로젝트 수정창에도 휴지통 동작을 추가했습니다. 연결된 업무 기록은 보존됩니다.",
+      "공용 수정창의 기존 기록에는 일관된 소프트 삭제 동작을 제공하도록 정리했습니다.",
+    ],
+  },
+  {
     id: "20260922-calendar-layout-reset",
     date: "2026-09-22",
     title: "업무 캘린더 레이아웃 재구성",

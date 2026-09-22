@@ -528,11 +528,13 @@ function ProjectForm({
   data,
   project,
   onSave,
+  onArchive,
   onClose,
 }: {
   data: Data;
   project: WorkProject | null;
   onSave: Save;
+  onArchive: (project: WorkProject) => void;
   onClose: () => void;
 }) {
   useModalEscape(onClose);
@@ -630,6 +632,20 @@ function ProjectForm({
           <textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} />
         </label>
         <footer>
+          {project && (
+            <button
+              type="button"
+              className="danger-text"
+              onClick={() => {
+                if (window.confirm("이 프로젝트를 휴지통으로 이동할까요? 연결된 업무 기록은 보존됩니다.")) {
+                  onArchive(project);
+                  onClose();
+                }
+              }}
+            >
+              휴지통
+            </button>
+          )}
           <button type="button" onClick={onClose}>
             취소
           </button>
@@ -1051,7 +1067,7 @@ export function TaskWorkspace({
         </main>
       </div>
       {taskEditor !== undefined && <TaskForm data={data} today={today} now={serverNow} task={taskEditor} initialProjectId={taskEditor ? "" : newTaskProjectId} initialDate={taskEditor ? "" : newTaskDate} onSave={onSave} onArchive={(task) => onUpdate("tasks", task.id, { deleted_at: serverNow })} onClose={() => { setTaskEditor(undefined); setNewTaskDate(""); }} />}
-      {projectEditor !== undefined && <ProjectForm data={data} project={projectEditor} onSave={onSave} onClose={() => setProjectEditor(undefined)} />}
+      {projectEditor !== undefined && <ProjectForm data={data} project={projectEditor} onSave={onSave} onArchive={(project) => onUpdate("workProjects", project.id, { deleted_at: serverNow })} onClose={() => setProjectEditor(undefined)} />}
     </div>
   );
 }
