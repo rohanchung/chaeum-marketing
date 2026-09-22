@@ -2558,7 +2558,7 @@ textarea {
 .calendar-day > b {
   font-size: 11px;
 }
-.calendar-day button {
+.calendar-day .calendar-task {
   display: block;
   width: 100%;
   margin-top: 3px;
@@ -2683,19 +2683,33 @@ textarea {
 }
 
 /* Calendar-first task workspace: the calendar is the main view and the task tree stays beside it. */
+.work-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.work-main {
+  min-width: 0;
+}
 .work-overview-grid {
-  grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
   grid-template-areas: "calendar list";
-  align-items: start;
+  height: calc(100dvh - 104px);
+  min-height: 560px;
+  align-items: stretch;
 }
 .task-calendar {
   grid-area: calendar;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
   min-width: 0;
 }
 .task-tree {
   grid-area: list;
-  align-self: start;
-  max-height: 620px;
+  height: 100%;
+  max-height: none;
   overflow: auto;
 }
 .calendar-main .section-toolbar small {
@@ -2748,19 +2762,28 @@ textarea {
 }
 .calendar-main .section-toolbar,
 .task-tree .section-toolbar {
-  margin-bottom: 2px;
+  min-height: 24px;
+  margin-bottom: 4px;
 }
 .calendar-day {
-  min-height: 68px;
-  padding: 3px;
+  min-height: 0;
+  padding: 3px 5px;
+  background: #fff;
+  cursor: pointer;
 }
-.calendar-day-add {
+.calendar-day.calendar-day-outside {
+  background: transparent;
+}
+.calendar-day .calendar-day-add {
   display: flex;
   width: 100%;
+  height: 14px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1px;
+  margin: 0;
+  padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--ink);
   text-align: left;
@@ -2781,13 +2804,13 @@ textarea {
 
 /* Second line (2L): compact title, calendar navigation, clock, and actions. */
 .task-2l {
-  display: flex;
-  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 42px;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   margin: 0 0 6px;
-  padding: 0 0 4px;
+  padding: 2px 0 5px;
   border-bottom: 1px solid #e5ece5;
 }
 .task-2l h1 {
@@ -2800,6 +2823,7 @@ textarea {
   min-width: 0;
   align-items: center;
   gap: 7px;
+  overflow: hidden;
 }
 .task-2l-leading .task-filters {
   display: flex;
@@ -2816,7 +2840,7 @@ textarea {
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  min-width: 0;
+  min-width: max-content;
 }
 .task-2l-tools input[type="month"] {
   width: 112px;
@@ -2825,6 +2849,7 @@ textarea {
 .task-2l-tools button {
   padding: 4px 7px;
   font-size: 10px;
+  white-space: nowrap;
 }
 .task-clock {
   margin: 0 3px 0 5px;
@@ -2838,11 +2863,10 @@ textarea {
   font-size: 9px !important;
 }
 .calendar-main .calendar-grid {
-  height: calc(100vh - 245px);
-  max-height: none;
-  min-height: 360px;
+  height: calc(100dvh - 166px);
+  min-height: 500px;
   overflow: hidden;
-  align-content: start;
+  flex: 1 1 auto;
 }
 .work-filters {
   display: flex;
@@ -2880,8 +2904,8 @@ textarea {
 }
 .calendar-week {
   position: relative;
-  flex: 0 0 auto;
-  min-height: 96px;
+  flex: 1 1 0;
+  min-height: 0;
 }
 .calendar-main .calendar-grid {
   display: flex;
@@ -2896,7 +2920,7 @@ textarea {
 .calendar-days {
   position: relative;
   z-index: 1;
-  min-height: 96px;
+  min-height: 0;
   height: 100%;
 }
 .calendar-week-bars {
@@ -2912,14 +2936,14 @@ textarea {
   min-width: 0;
   margin: 0 2px;
   overflow: hidden;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border: 0;
-  border-radius: 5px;
-  box-shadow: 0 1px 2px rgb(26 64 43 / 12%);
+  border-radius: 3px;
+  box-shadow: none;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 14px;
   font-weight: 650;
   pointer-events: auto;
@@ -3013,7 +3037,7 @@ textarea {
 @media (max-width: 760px) {
   .task-2l {
     align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
   .task-2l-tools {
     width: 100%;
@@ -3031,5 +3055,33 @@ textarea {
   .work-filters {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 1200px) {
+  .task-2l {
+    grid-template-columns: 1fr;
+  }
+  .task-2l-tools {
+    justify-content: flex-start;
+  }
+  .calendar-main .calendar-grid {
+    height: calc(100dvh - 210px);
+  }
+}
+
+@media (max-width: 960px) {
+  .work-overview-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "calendar" "list";
+    height: auto;
+    min-height: 0;
+  }
+  .task-tree {
+    height: auto;
+    max-height: 420px;
+  }
+  .calendar-main .calendar-grid {
+    height: 560px;
   }
 }

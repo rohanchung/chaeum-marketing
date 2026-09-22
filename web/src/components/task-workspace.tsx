@@ -976,27 +976,27 @@ export function TaskWorkspace({
           <button aria-label="다음 달" onClick={() => moveCalendarMonth(1)}>›</button>
           <button onClick={() => setCalendarMonth(today.slice(0, 7))}>오늘 {today.slice(5).replace("-", "/")}</button>
           <span className="task-clock">한국 {koreanClock(serverNow)}</span>
-          <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(""); setTaskEditor(null); }}>＋ 업무</button>
           <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
+          <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(""); setTaskEditor(null); }}>＋ 업무</button>
         </div>
       </div>
       <div className="work-layout">
         <main className="work-main">
           <div className="work-overview-grid">
             <section className="task-calendar calendar-main panel">
-              <div className="section-toolbar"><h2>{month.replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 사이 업무 흐름 포함 · 오늘 {today.slice(5).replace("-", "/")}</small></div>
+              <div className="section-toolbar"><h2>{month.replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 선택 · 업무 추가 · 휠로 월 전환</small></div>
               <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
               <div className="calendar-grid" onWheel={handleCalendarWheel}>
                 {calendarWeeks.map(({ week, bars, laneCount }, weekIndex) => (
                   <div className="calendar-week" key={`week-${weekIndex}`} style={{ minHeight: `${Math.max(96, 21 + laneCount * 19)}px` }}>
                     <div className="calendar-days">
-                      {week.map((day, index) => <div className={`${!day ? "calendar-day empty" : day === today ? "calendar-day today" : day === selectedDate ? "calendar-day selected" : "calendar-day"}${day && dragOverDate === day ? " drag-over" : ""}`} key={day ?? `empty-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)} onDragOver={(event) => { if (day && draggedTaskId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDragOverDate(day); } }} onDragLeave={() => day && dragOverDate === day && setDragOverDate(null)} onDrop={(event) => { if (!day) return; event.preventDefault(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; if (taskId) moveTaskToDate(taskId, day); }}>
+                      {week.map((day, index) => <div className={`${day ? "calendar-day" : "calendar-day calendar-day-outside"}${day === today ? " today" : ""}${day === selectedDate ? " selected" : ""}${day && dragOverDate === day ? " drag-over" : ""}`} key={day ?? `outside-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)} onDragOver={(event) => { if (day && draggedTaskId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDragOverDate(day); } }} onDragLeave={() => day && dragOverDate === day && setDragOverDate(null)} onDrop={(event) => { if (!day) return; event.preventDefault(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; if (taskId) moveTaskToDate(taskId, day); }}>
                         {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>
                           <b>{Number(day.slice(-2))}</b><span>＋</span>
                         </button>}
                       </div>)}
                     </div>
-                    <div className="calendar-week-bars" aria-label="프로젝트 업무 흐름">
+                    <div className="calendar-week-bars" aria-label="일정 흐름">
                       {bars.map((bar) => {
                         const task = bar.kind === "task" ? bar.task : undefined;
                         const project = bar.kind === "project" ? bar.project : task ? data.workProjects.find((item) => item.id === task.project_id) : undefined;
@@ -1007,7 +1007,7 @@ export function TaskWorkspace({
                           className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}${bar.kind === "event" ? " calendar-event-bar" : ""}${bar.kind === "task" && bar.task.status === "done" ? " done" : ""}`}
                           key={`${bar.kind}:${bar.kind === "project" ? bar.project.id : bar.kind === "event" ? bar.event.id : bar.task.id}:${weekIndex}`}
                           draggable={draggable}
-                          style={{ left: `${((bar.startColumn - 1) / 7) * 100}%`, width: `calc(${((bar.endColumn - bar.startColumn) / 7) * 100}% - 4px)`, top: `${18 + bar.lane * 19}px`, backgroundColor: color, color: readableOnColor(color) }}
+                          style={{ left: `${((bar.startColumn - 1) / 7) * 100}%`, width: `calc(${((bar.endColumn - bar.startColumn) / 7) * 100}% - 4px)`, top: `${20 + bar.lane * 19}px`, backgroundColor: color, color: readableOnColor(color) }}
                           title={`${bar.label}${project ? ` · ${project.name}` : event ? ` · ${event.location ?? "이벤트"}` : ""}`}
                           onDragStart={(dragEvent) => { if (!draggable || !task) return; dragEvent.dataTransfer.effectAllowed = "move"; dragEvent.dataTransfer.setData("text/plain", task.id); setDraggedTaskId(task.id); }}
                           onDragEnd={() => { setDraggedTaskId(null); setDragOverDate(null); }}
@@ -1032,9 +1032,6 @@ export function TaskWorkspace({
                   <button onClick={() => onEditEvent(null, selectedDate)}>＋ 이벤트</button>
                 </div>
               </div>
-              {dailyTasks.length ? dailyTasks.map((task) => (
-                <TaskRow key={task.id} task={task} data={data} today={today} onToggle={toggle} onEdit={(item) => setTaskEditor(item)} />
-              )) : null}
               {dailyEvents.map((event) => (
                 <div className="task-event-row" key={event.id}>
                   <span className="task-event-dot" aria-hidden="true" />
@@ -1045,6 +1042,9 @@ export function TaskWorkspace({
                   <button aria-label={`${event.title} 이벤트 수정`} onClick={() => onEditEvent(event)}>⋯</button>
                 </div>
               ))}
+              {dailyTasks.length ? dailyTasks.map((task) => (
+                <TaskRow key={task.id} task={task} data={data} today={today} onToggle={toggle} onEdit={(item) => setTaskEditor(item)} />
+              )) : null}
               {!dailyTasks.length && !dailyEvents.length && <div className="empty-small">이 날짜에 예정된 업무나 이벤트가 없습니다.</div>}
             </section>
           </div>

@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260922-calendar-layout-reset",
+    date: "2026-09-22",
+    title: "업무 캘린더 레이아웃 재구성",
+    room: "현재 제작방",
+    changes: [
+      "빈 날짜 칸이 공통 빈 상태 스타일을 상속해 카드처럼 보이던 충돌을 제거했습니다.",
+      "날짜 헤더와 일정 바 스타일을 분리해 날짜는 좌상단, 이벤트·업무·프로젝트 바는 바로 아래에 표시합니다.",
+      "캘린더와 선택 날짜 업무 목록이 같은 화면 높이를 나눠 쓰도록 재구성하고, 상단 도구가 화면 밖으로 밀리지 않게 정리했습니다.",
+    ],
+  },
+  {
     id: "20260922-calendar-lanes-events",
     date: "2026-09-22",
     title: "캘린더 날짜별 줄 배치와 이벤트 우선 표시",
