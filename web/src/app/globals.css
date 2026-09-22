@@ -2795,6 +2795,22 @@ textarea {
   font-size: 18px;
   line-height: 1;
 }
+.task-2l-leading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+.task-2l-leading .task-filters {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 3px;
+}
+.task-2l-leading .task-filters button {
+  padding: 4px 7px;
+  font-size: 10px;
+  white-space: nowrap;
+}
 .task-2l-tools {
   display: flex;
   align-items: center;
@@ -2825,8 +2841,7 @@ textarea {
   height: calc(100vh - 245px);
   max-height: none;
   min-height: 360px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   align-content: start;
 }
 .work-filters {
@@ -3002,6 +3017,10 @@ textarea {
   .task-2l-tools {
     width: 100%;
     justify-content: flex-start;
+    overflow-x: auto;
+  }
+  .task-2l-leading {
+    width: 100%;
     overflow-x: auto;
   }
   .calendar-main .calendar-grid {

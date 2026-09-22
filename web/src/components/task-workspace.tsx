@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, WheelEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   Data,
   MarketingEvent,
@@ -736,6 +736,7 @@ export function TaskWorkspace({
   const [projectEditor, setProjectEditor] = useState<WorkProject | null | undefined>();
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const calendarWheelLocked = useRef(false);
   const materialized = useMemo(
     () => materializedTasks(data, today),
     [data, today],
@@ -794,6 +795,16 @@ export function TaskWorkspace({
     const next = new Date(Date.UTC(year, currentMonth - 1 + offset, 1));
     const nextMonth = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
     setCalendarMonth(nextMonth);
+  };
+  const handleCalendarWheel = (event: WheelEvent<HTMLDivElement>) => {
+    if (!event.deltaY || Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
+    event.preventDefault();
+    if (calendarWheelLocked.current) return;
+    calendarWheelLocked.current = true;
+    moveCalendarMonth(event.deltaY > 0 ? 1 : -1);
+    window.setTimeout(() => {
+      calendarWheelLocked.current = false;
+    }, 320);
   };
   for (const task of visibleTasks) {
     const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
@@ -915,7 +926,29 @@ export function TaskWorkspace({
   return (
     <div className="work-page">
       <div className="task-2l">
-        <h1>업무</h1>
+        <div className="task-2l-leading">
+          <h1>업무</h1>
+          <div className="segmented task-filters">
+            {([
+              ["today", "오늘"],
+              ["all", "전체"],
+              ["requested", "요청받은 업무"],
+              ["recurring", "반복 업무"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                className={value === "all" ? (!filters.length ? "selected" : "") : filters.includes(value) ? "selected" : ""}
+                onClick={() => value === "all" ? resetFilters() : toggleFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+            <button className={showProjects ? "selected project-toggle" : "project-toggle"} onClick={() => setShowProjects((current) => !current)}>
+              프로젝트
+            </button>
+          </div>
+          <span className="task-sync-status" role="status">{syncLabel}</span>
+        </div>
         <div className="task-2l-tools">
           <button aria-label="이전 달" onClick={() => moveCalendarMonth(-1)}>‹</button>
           <input aria-label="업무 캘린더 월" type="month" value={month} onChange={(event) => event.target.value && setCalendarMonth(event.target.value)} />
@@ -926,35 +959,13 @@ export function TaskWorkspace({
           <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
         </div>
       </div>
-      <div className="work-filters">
-        <div className="segmented">
-          {([
-            ["today", "오늘"],
-            ["all", "전체"],
-            ["requested", "요청받은 업무"],
-            ["recurring", "반복 업무"],
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              className={value === "all" ? (!filters.length ? "selected" : "") : filters.includes(value) ? "selected" : ""}
-              onClick={() => value === "all" ? resetFilters() : toggleFilter(value)}
-            >
-              {label}
-            </button>
-          ))}
-          <button className={showProjects ? "selected project-toggle" : "project-toggle"} onClick={() => setShowProjects((current) => !current)}>
-            프로젝트
-          </button>
-        </div>
-        <span className="task-sync-status" role="status">{syncLabel}</span>
-      </div>
       <div className="work-layout">
         <main className="work-main">
           <div className="work-overview-grid">
             <section className="task-calendar calendar-main panel">
               <div className="section-toolbar"><h2>{month.replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 사이 업무 흐름 포함 · 오늘 {today.slice(5).replace("-", "/")}</small></div>
               <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
-              <div className="calendar-grid">
+              <div className="calendar-grid" onWheel={handleCalendarWheel}>
                 {calendarWeeks.map(({ week, bars }, weekIndex) => (
                   <div className="calendar-week" key={`week-${weekIndex}`} style={{ minHeight: `${Math.max(112, 48 + bars.length * 22)}px` }}>
                     <div className="calendar-days">
