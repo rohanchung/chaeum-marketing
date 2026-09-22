@@ -2778,3 +2778,64 @@ textarea {
 .calendar-day.today .calendar-day-add span {
   opacity: 1;
 }
+
+/* Second line (2L): compact title, calendar navigation, clock, and actions. */
+.task-2l {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 0 0 4px;
+  border-bottom: 1px solid #e5ece5;
+}
+.task-2l h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+.task-2l-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+}
+.task-2l-tools input[type="month"] {
+  width: 112px;
+  padding: 4px 6px;
+}
+.task-2l-tools button {
+  padding: 4px 7px;
+  font-size: 10px;
+}
+.task-clock {
+  margin: 0 3px 0 5px;
+  color: #557261;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.task-project-label {
+  color: #557d63 !important;
+  font-size: 9px !important;
+}
+.calendar-main .calendar-grid {
+  max-height: calc(100vh - 275px);
+  min-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-content: start;
+}
+@media (max-width: 760px) {
+  .task-2l {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .task-2l-tools {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+}

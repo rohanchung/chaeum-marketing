@@ -46,7 +46,6 @@ import {
   saveMetricOrder,
   saveChannelOrder,
   saveRecord,
-  deleteRecord,
   updateRecord,
 } from "@/lib/repository";
 import { downloadExcelReport, openPrintableReport } from "@/lib/report-export";
@@ -68,7 +67,7 @@ const tabs = ["대시보드", "업무", "콘텐츠", "이벤트", "구매", "분
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
 export default function Home() {
   const [workspace, setWorkspace] = useState<string | null>(null);
-  const { today, synced: clockSynced } = useServerDate(!!workspace);
+  const { today, now: serverNow, synced: clockSynced } = useServerDate(!!workspace);
   const clockInitialized = useRef(false);
   const [initializing, setInitializing] = useState(true);
   const [data, setData] = useState<Data>(emptyData);
@@ -338,7 +337,7 @@ export default function Home() {
             task_id: templateId,
             occurrence_on: occurrenceOn,
             status: completed ? "done" : "planned",
-            completed_at: completed ? new Date().toISOString() : null,
+            completed_at: completed ? serverNow : null,
           },
           { onConflict: "workspace_id,task_id,occurrence_on" },
         );
@@ -350,7 +349,7 @@ export default function Home() {
         recurrence_next_on: next,
         recurrence_active: next !== null,
         status: next === null ? "done" : "planned",
-        completed_at: next === null ? new Date().toISOString() : null,
+        completed_at: next === null ? serverNow : null,
       });
       await refresh(workspace);
       setNotice(completed ? "반복 업무를 완료하고 다음 일정을 만들었습니다." : "반복 업무를 되돌렸습니다.");
@@ -544,7 +543,7 @@ export default function Home() {
                   ? "저장된 기록과 동기화됨"
                   : "데이터 확인 필요"}
           </div>
-          {nav !== "로그" && (
+          {nav !== "로그" && nav !== "업무" && (
             <div className="toolbar-controls">
               {nav !== "대시보드" && nav !== "업무" && (
                 <div className="segmented">
@@ -744,16 +743,12 @@ export default function Home() {
               <TaskWorkspace
                 data={data}
                 today={today}
+                serverNow={serverNow}
+                month={month}
+                onMonthChange={setMonth}
                 onSave={(collection, record) => mutate(collection, record)}
                 onUpdate={(collection, id, patch) => changeState(collection, id, patch)}
                 onCompleteRecurring={completeRecurringTask}
-                onDelete={(collection, id) =>
-                  fire(async () => {
-                    await deleteRecord(workspace, collection, id);
-                    await refresh(workspace);
-                    setNotice("연결을 해제했습니다.");
-                  })
-                }
               />
             )}
             {nav === "콘텐츠" && (

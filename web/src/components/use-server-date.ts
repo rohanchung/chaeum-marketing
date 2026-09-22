@@ -5,20 +5,27 @@ import { projectedServerDate } from "@/lib/server-date";
 import { supabase } from "@/lib/supabase";
 
 export function useServerDate(enabled: boolean) {
-  const [clock, setClock] = useState({ today: localDate(), synced: false });
+  const [clock, setClock] = useState({
+    today: localDate(),
+    now: new Date().toISOString(),
+    synced: false,
+  });
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
     let anchor: { now: string; at: number } | null = null;
     const tick = () => {
       if (!alive) return;
-      const today = anchor
-        ? projectedServerDate(anchor.now, performance.now() - anchor.at)
-        : localDate();
+      const now = anchor
+        ? new Date(
+            Date.parse(anchor.now) + Math.max(0, performance.now() - anchor.at),
+          ).toISOString()
+        : new Date().toISOString();
+      const today = projectedServerDate(now, 0);
       setClock((prev) =>
-        prev.today === today && prev.synced === !!anchor
+        prev.today === today && prev.synced === !!anchor && prev.now === now
           ? prev
-          : { today, synced: !!anchor },
+          : { today, now, synced: !!anchor },
       );
     };
     const sync = async () => {
