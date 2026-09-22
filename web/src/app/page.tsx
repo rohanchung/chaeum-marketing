@@ -768,6 +768,7 @@ export default function Home() {
             {nav === "업무" && (
               <TaskWorkspace
                 data={data}
+                events={data.events}
                 today={today}
                 serverNow={serverNow}
                 syncLabel={busy ? "저장·조회 중…" : error ? "확인 필요" : ready ? `저장된 기록과 동기화됨 · ${koreanClock(lastSavedAt ?? serverNow)}` : "데이터 확인 필요"}
@@ -775,6 +776,9 @@ export default function Home() {
                 onMonthChange={setMonth}
                 onSave={(collection, record) => mutate(collection, record)}
                 onUpdate={(collection, id, patch) => changeState(collection, id, patch)}
+                onEditEvent={(event, date) => {
+                  edit({ collection: "events", record: event ? objectRecord(event) : { starts_at: timestamp(date ?? today) } });
+                }}
                 onCompleteRecurring={completeRecurringTask}
               />
             )}

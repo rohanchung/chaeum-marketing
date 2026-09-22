@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260922-event-sharing-workspace",
+    date: "2026-09-22",
+    title: "대시보드·업무 이벤트 공유",
+    room: "현재 제작방",
+    changes: [
+      "대시보드와 업무 페이지가 동일한 marketing_events 원본을 함께 표시하도록 연결했습니다.",
+      "업무 캘린더에 이벤트 기간 바를 표시하고, 날짜를 선택하면 진행 중인 이벤트를 오른쪽 목록에서 확인할 수 있습니다.",
+      "업무 페이지에서 이벤트를 추가·수정하면 대시보드 이벤트 목록과 날짜 활동에 같은 기록으로 반영됩니다.",
+    ],
+  },
+  {
     id: "20260922-task-calendar-bars-filters",
     date: "2026-09-22",
     title: "업무 캘린더 연속 바·필터·프로젝트 색상",

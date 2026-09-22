@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   Data,
+  MarketingEvent,
   Task,
   TaskPriority,
   TaskSource,
@@ -694,6 +695,7 @@ function TaskRow({
 
 export function TaskWorkspace({
   data,
+  events,
   today,
   serverNow,
   syncLabel,
@@ -701,10 +703,12 @@ export function TaskWorkspace({
   onMonthChange,
   onSave,
   onUpdate,
+  onEditEvent,
   initialCreate = false,
   onCompleteRecurring,
 }: {
   data: Data;
+  events: MarketingEvent[];
   today: string;
   serverNow: string;
   syncLabel: string;
@@ -712,6 +716,7 @@ export function TaskWorkspace({
   onMonthChange: (month: string) => void;
   onSave: Save;
   onUpdate: Update;
+  onEditEvent: (event: MarketingEvent | null, date?: string) => void;
   initialCreate?: boolean;
   onCompleteRecurring?: (task: Task, completed: boolean) => void | Promise<void>;
 }) {
@@ -795,6 +800,7 @@ export function TaskWorkspace({
       }
     }
   }
+  const activeEvents = events.filter((event) => !event.deleted_at);
   const calendarWeeks = Array.from({ length: calendarCells.length / 7 }, (_, weekIndex) => {
     const week = calendarCells.slice(weekIndex * 7, weekIndex * 7 + 7);
     const weekDays = week.filter((day): day is string => !!day);
@@ -821,6 +827,27 @@ export function TaskWorkspace({
           label: segmentStart === rangeStart ? project.name : `↳ ${project.name}`,
         }];
       });
+    const eventBars = !weekStart || !weekEnd ? [] : activeEvents.flatMap((event) => {
+      const start = dateOnly(event.starts_at);
+      const due = dateOnly(event.ends_at) ?? start;
+      if (!start || !due) return [];
+      const rangeStart = start <= due ? start : due;
+      const rangeEnd = start <= due ? due : start;
+      if (rangeEnd < weekStart || rangeStart > weekEnd) return [];
+      const segmentStart = rangeStart < weekStart ? weekStart : rangeStart;
+      const segmentEnd = rangeEnd > weekEnd ? weekEnd : rangeEnd;
+      const startColumn = week.findIndex((day) => day === segmentStart) + 1;
+      const endColumn = week.findIndex((day) => day === segmentEnd) + 2;
+      if (startColumn < 1 || endColumn <= startColumn) return [];
+      return [{
+        kind: "event" as const,
+        event,
+        startColumn,
+        endColumn,
+        lane: 0,
+        label: segmentStart === rangeStart ? event.title : `↳ ${event.title}`,
+      }];
+    });
     const taskBars = !weekStart || !weekEnd ? [] : visibleTasks.flatMap((task) => {
       const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
       const due = dateOnly(task.due_at) ?? start;
@@ -842,7 +869,7 @@ export function TaskWorkspace({
         label: segmentStart === rangeStart ? task.title : `↳ ${task.title}`,
       }];
     });
-    const bars = [...projectBars, ...taskBars];
+    const bars = [...projectBars, ...eventBars, ...taskBars];
     const sortedBars = bars
       .sort((a, b) => a.startColumn - b.startColumn || a.kind.localeCompare(b.kind) || a.endColumn - b.endColumn)
       .map((bar, index) => ({ ...bar, lane: index }));
@@ -851,6 +878,11 @@ export function TaskWorkspace({
   const dailyTasks = (calendarTasks.get(selectedDate) ?? []).filter(
     (task, index, tasks) => tasks.findIndex((item) => item.id === task.id) === index,
   );
+  const dailyEvents = activeEvents.filter((event) => {
+    const start = dateOnly(event.starts_at);
+    const end = dateOnly(event.ends_at) ?? start;
+    return !!start && !!end && start <= selectedDate && selectedDate <= end;
+  });
   const toggleFilter = (value: "today" | "requested" | "recurring") => {
     setFilters((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
   };
@@ -913,13 +945,14 @@ export function TaskWorkspace({
                       {bars.map((bar) => {
                         const task = bar.kind === "task" ? bar.task : undefined;
                         const project = bar.kind === "project" ? bar.project : task ? data.workProjects.find((item) => item.id === task.project_id) : undefined;
-                        const color = projectColor(project);
+                        const event = bar.kind === "event" ? bar.event : undefined;
+                        const color = event ? "#8b68b6" : projectColor(project);
                         return <button
-                          className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}`}
-                          key={`${bar.kind}:${bar.kind === "project" ? bar.project.id : bar.task.id}:${weekIndex}`}
+                          className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}${bar.kind === "event" ? " calendar-event-bar" : ""}`}
+                          key={`${bar.kind}:${bar.kind === "project" ? bar.project.id : bar.kind === "event" ? bar.event.id : bar.task.id}:${weekIndex}`}
                           style={{ gridColumn: `${bar.startColumn} / ${bar.endColumn}`, top: `${42 + bar.lane * 22}px`, backgroundColor: color, color: readableOnColor(color) }}
-                          title={`${bar.label}${project ? ` · ${project.name}` : ""}`}
-                          onClick={(event) => { event.stopPropagation(); if (task) setTaskEditor(task); else if (project) setProjectEditor(project); }}
+                          title={`${bar.label}${project ? ` · ${project.name}` : event ? ` · ${event.location ?? "이벤트"}` : ""}`}
+                          onClick={(clickEvent) => { clickEvent.stopPropagation(); if (task) setTaskEditor(task); else if (project) setProjectEditor(project); else if (event) onEditEvent(event); }}
                         >
                           {bar.label}
                         </button>;
@@ -933,13 +966,27 @@ export function TaskWorkspace({
               <div className="section-toolbar">
                 <div>
                   <h2>{selectedDate.slice(5).replace("-", "/")} 업무 목록</h2>
-                  <small>선택일 업무 · 계속 업무 포함 · {dailyTasks.length}건</small>
+                  <small>선택일 업무 {dailyTasks.length}건 · 이벤트 {dailyEvents.length}건</small>
                 </div>
-                <button onClick={() => openTaskForDate(selectedDate)}>＋ 업무</button>
+                <div className="inline-tools">
+                  <button onClick={() => openTaskForDate(selectedDate)}>＋ 업무</button>
+                  <button onClick={() => onEditEvent(null, selectedDate)}>＋ 이벤트</button>
+                </div>
               </div>
               {dailyTasks.length ? dailyTasks.map((task) => (
                 <TaskRow key={task.id} task={task} data={data} today={today} onToggle={toggle} onEdit={(item) => setTaskEditor(item)} />
-              )) : <div className="empty-small">이 날짜에 예정되거나 이어지는 업무가 없습니다.</div>}
+              )) : null}
+              {dailyEvents.map((event) => (
+                <div className="task-event-row" key={event.id}>
+                  <span className="task-event-dot" aria-hidden="true" />
+                  <div>
+                    <strong>{event.title}</strong>
+                    <small>이벤트 · {event.location || "장소 미입력"} · {event.status}</small>
+                  </div>
+                  <button aria-label={`${event.title} 이벤트 수정`} onClick={() => onEditEvent(event)}>⋯</button>
+                </div>
+              ))}
+              {!dailyTasks.length && !dailyEvents.length && <div className="empty-small">이 날짜에 예정된 업무나 이벤트가 없습니다.</div>}
             </section>
           </div>
         </main>

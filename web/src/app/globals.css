@@ -2908,6 +2908,40 @@ textarea {
   font-weight: 650;
   pointer-events: auto;
 }
+.calendar-week-bars .calendar-event-bar {
+  border: 1px solid rgb(255 255 255 / 35%);
+  font-weight: 600;
+}
+.task-event-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 5px 4px;
+  border-top: 1px solid #edf1ed;
+}
+.task-event-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8b68b6;
+}
+.task-event-row strong,
+.task-event-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-event-row strong {
+  font-size: 11px;
+}
+.task-event-row small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+}
 .calendar-day.selected {
   box-shadow: inset 0 0 0 2px #78ad87;
 }
