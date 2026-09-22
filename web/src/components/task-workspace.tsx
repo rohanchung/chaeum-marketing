@@ -716,7 +716,7 @@ export function TaskWorkspace({
   onCompleteRecurring?: (task: Task, completed: boolean) => void | Promise<void>;
 }) {
   const [filters, setFilters] = useState<Array<"today" | "requested" | "recurring">>([]);
-  const [projectFilters, setProjectFilters] = useState<string[]>([]);
+  const [showProjects, setShowProjects] = useState(false);
   const [taskEditor, setTaskEditor] = useState<Task | null | undefined>(initialCreate ? null : undefined);
   const [newTaskProjectId, setNewTaskProjectId] = useState("");
   const [newTaskDate, setNewTaskDate] = useState("");
@@ -727,9 +727,8 @@ export function TaskWorkspace({
     [data, today],
   );
   const visibleTasks = useMemo(() => {
-    const hasFilters = filters.length > 0 || projectFilters.length > 0;
-    const tasks = hasFilters
-      ? materialized.filter((task) => projectFilters.includes(task.project_id ?? "") || filters.some((filter) => {
+    const tasks = filters.length
+      ? materialized.filter((task) => filters.some((filter) => {
           if (filter === "today") {
             const start = dateOnly(task.start_at);
             const due = dateOnly(task.due_at);
@@ -747,7 +746,7 @@ export function TaskWorkspace({
       const bDue = dateOnly(b.due_at) ?? "9999-12-31";
       return aDone - bDone || aDue.localeCompare(bDue) || a.sort_order - b.sort_order;
     });
-  }, [materialized, filters, projectFilters, today]);
+  }, [materialized, filters, today]);
   const toggle = (task: Task) => {
     if (task.recurrence_template_id && task.occurrence_on && onCompleteRecurring) {
       void Promise.resolve(onCompleteRecurring(task, task.status !== "done")).catch(() => {});
@@ -801,9 +800,9 @@ export function TaskWorkspace({
     const weekDays = week.filter((day): day is string => !!day);
     const weekStart = weekDays[0];
     const weekEnd = weekDays[weekDays.length - 1];
-    const showProjectBars = !filters.length || projectFilters.length > 0;
+    const showProjectBars = showProjects;
     const projectBars = !weekStart || !weekEnd || !showProjectBars ? [] : data.workProjects
-      .filter((project) => !project.deleted_at && project.start_on && project.due_on && (!projectFilters.length || projectFilters.includes(project.id)))
+      .filter((project) => !project.deleted_at && project.start_on && project.due_on)
       .flatMap((project) => {
         const rangeStart = project.start_on! <= project.due_on! ? project.start_on! : project.due_on!;
         const rangeEnd = project.start_on! <= project.due_on! ? project.due_on! : project.start_on!;
@@ -855,12 +854,8 @@ export function TaskWorkspace({
   const toggleFilter = (value: "today" | "requested" | "recurring") => {
     setFilters((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
   };
-  const toggleProjectFilter = (projectId: string) => {
-    setProjectFilters((current) => current.includes(projectId) ? current.filter((item) => item !== projectId) : [...current, projectId]);
-  };
   const resetFilters = () => {
     setFilters([]);
-    setProjectFilters([]);
   };
   return (
     <div className="work-page">
@@ -873,6 +868,7 @@ export function TaskWorkspace({
           <button onClick={() => setCalendarMonth(today.slice(0, 7))}>오늘 {today.slice(5).replace("-", "/")}</button>
           <span className="task-clock">한국 {koreanClock(serverNow)}</span>
           <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(""); setTaskEditor(null); }}>＋ 업무</button>
+          <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
         </div>
       </div>
       <div className="work-filters">
@@ -885,23 +881,15 @@ export function TaskWorkspace({
           ] as const).map(([value, label]) => (
             <button
               key={value}
-              className={value === "all" ? (!filters.length && !projectFilters.length ? "selected" : "") : filters.includes(value) ? "selected" : ""}
+              className={value === "all" ? (!filters.length ? "selected" : "") : filters.includes(value) ? "selected" : ""}
               onClick={() => value === "all" ? resetFilters() : toggleFilter(value)}
             >
               {label}
             </button>
           ))}
-          {data.workProjects.filter((project) => !project.deleted_at).sort((a, b) => a.sort_order - b.sort_order).map((project) => (
-            <button
-              key={project.id}
-              className={projectFilters.includes(project.id) ? "selected project-filter" : "project-filter"}
-              onClick={() => toggleProjectFilter(project.id)}
-              title={`프로젝트 필터 · ${project.name}`}
-            >
-              <i style={{ backgroundColor: projectColor(project) }} />{project.name}
-            </button>
-          ))}
-          <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
+          <button className={showProjects ? "selected project-toggle" : "project-toggle"} onClick={() => setShowProjects((current) => !current)}>
+            프로젝트
+          </button>
         </div>
         <span className="task-sync-status" role="status">{syncLabel}</span>
       </div>
