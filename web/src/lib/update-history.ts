@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260923-dashboard-task-content-ui",
+    date: "2026-09-23",
+    title: "대시보드·업무·콘텐츠 운영 화면 정리",
+    room: "현재 제작방",
+    changes: [
+      "대시보드를 핵심 성과 요약과 운영시트에 집중되는 밀도 높은 화면으로 정리했습니다.",
+      "업무는 캘린더와 선택 날짜 업무 카드를 한 화면의 수평 작업 영역으로 정리했습니다.",
+      "콘텐츠는 채널별 표로 바꾸고, 소재가 없는 채널 자체 지표도 대표 값·월간 값·비용으로 확인할 수 있게 했습니다.",
+    ],
+  },
+  {
     id: "20260923-task-card-checklists",
     date: "2026-09-23",
     title: "업무 카드 세부 체크리스트",

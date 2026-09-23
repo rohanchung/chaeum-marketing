@@ -1316,7 +1316,7 @@ export function TaskWorkspace({
           <button aria-label="이전 달" onClick={() => moveCalendarMonth(-1)}>‹</button>
           <input aria-label="업무 캘린더 월" type="month" value={month} onChange={(event) => event.target.value && setCalendarMonth(event.target.value)} />
           <button aria-label="다음 달" onClick={() => moveCalendarMonth(1)}>›</button>
-          <button onClick={() => setCalendarMonth(today.slice(0, 7))}>오늘 {today.slice(5).replace("-", "/")}</button>
+          <button onClick={() => setCalendarMonth(today.slice(0, 7))}>오늘</button>
           <span className="task-clock">한국 {koreanClock(serverNow)}</span>
           <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
           <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(""); setNewTaskParentId(""); setNewTaskTitle(""); setTaskEditor(null); }}>＋ 업무</button>

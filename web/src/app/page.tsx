@@ -31,7 +31,6 @@ import {
   scopeLabels,
   timestamp,
   isBusinessProfile,
-  compareContentCreated,
 } from "@/lib/domain";
 import { report, sourceName } from "@/lib/analytics";
 import {
@@ -61,6 +60,7 @@ import { useNavigation } from "@/components/use-navigation";
 import {
   TaskWorkspace,
 } from "@/components/task-workspace";
+import { ContentLibrary } from "@/components/content-library";
 import { nextTaskOccurrence } from "@/lib/task-recurrence";
 
 const tabs = ["대시보드", "업무", "콘텐츠", "이벤트", "구매", "분석", "리포트", "로그"];
@@ -557,19 +557,19 @@ export default function Home() {
           로그아웃 ↗
         </button>
       </header>
-      <div className="workspace">
-        <div className="toolbar">
-          {nav !== "업무" && <div className="status" role="status">
+      <div className={`workspace${nav === "대시보드" ? " dashboard-page" : nav === "콘텐츠" ? " content-page" : ""}`}>
+        <div className={`toolbar${nav === "대시보드" ? " dashboard-toolbar" : ""}`}>
+          {nav !== "업무" && nav !== "콘텐츠" && <div className="status" role="status">
               <i className={error ? "error" : busy ? "pending" : ""} />
               {busy
                 ? "저장·조회 중…"
                 : error
                   ? "확인 필요"
                   : ready
-                    ? "저장된 기록과 동기화됨"
+                    ? `마지막 저장 ${datePart(lastSavedAt ?? serverNow).slice(5).replace("-", "/")} ${koreanClock(lastSavedAt ?? serverNow)}`
                     : "데이터 확인 필요"}
             </div>}
-          {nav !== "로그" && nav !== "업무" && (
+          {nav !== "로그" && nav !== "업무" && nav !== "콘텐츠" && (
             <div className="toolbar-controls">
               {nav !== "대시보드" && nav !== "업무" && (
                 <div className="segmented">
@@ -637,7 +637,7 @@ export default function Home() {
               </button>
               {nav === "대시보드" && (
                 <details className="quick-menu">
-                  <summary className="primary">＋ 빠른 입력</summary>
+                  <summary className="primary">＋ 입력</summary>
                   <div>
                     {[
                       ["contents", "소재 추가"],
@@ -687,7 +687,7 @@ export default function Home() {
         ) : (
           <>
             {nav === "대시보드" && (
-              <>
+              <section className="dashboard-workspace">
                 <Kpis report={currentReport} compact />
                 <OperatingSheet
                   data={data}
@@ -763,7 +763,7 @@ export default function Home() {
                     </div>
                   }
                 />
-              </>
+              </section>
             )}
             {nav === "업무" && (
               <TaskWorkspace
@@ -771,7 +771,7 @@ export default function Home() {
                 events={data.events}
                 today={today}
                 serverNow={serverNow}
-                syncLabel={busy ? "저장·조회 중…" : error ? "확인 필요" : ready ? `저장된 기록과 동기화됨 · ${koreanClock(lastSavedAt ?? serverNow)}` : "데이터 확인 필요"}
+                syncLabel={busy ? "저장·조회 중…" : error ? "확인 필요" : ready ? `마지막 저장 ${datePart(lastSavedAt ?? serverNow).slice(5).replace("-", "/")} ${koreanClock(lastSavedAt ?? serverNow)}` : "데이터 확인 필요"}
                 month={month}
                 onMonthChange={setMonth}
                 onSave={(collection, record) => mutate(collection, record)}
@@ -784,170 +784,58 @@ export default function Home() {
             )}
             {nav === "콘텐츠" && (
               <>
-                <PageTitle
-                  eyebrow="CONTENT LIBRARY"
-                  title="활동이 쌓이는 콘텐츠 라이브러리"
-                  detail="소재를 관리하고, 같은 소재에 여러 광고 집행을 연결하세요."
-                  action={
-                    <button
-                      className="primary"
-                      onClick={() => edit({ collection: "contents" })}
-                    >
-                      ＋ 소재 추가
-                    </button>
-                  }
+                <ContentLibrary
+                  data={data}
+                  month={month}
+                  today={today}
+                  lifecycle={lifecycle}
+                  search={search}
+                  onLifecycle={setLifecycle}
+                  onSearch={setSearch}
+                  onMonthChange={setMonth}
+                  onCreate={() => edit({ collection: "contents" })}
+                  onManageChannels={() => edit({ collection: "channels" })}
+                  onDetail={setDetail}
                 />
-                <div className="section-toolbar">
-                  <div className="segmented">
-                    {[
-                      ["active", "운영 중"],
-                      ["archive", "아카이브"],
-                      ["trash", "휴지통"],
-                    ].map(([key, label]) => (
-                      <button
-                        key={key}
-                        className={lifecycle === key ? "selected" : ""}
-                        onClick={() => setLifecycle(key)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    placeholder="소재 제목 검색"
-                    aria-label="소재 검색"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                <div className="content-grid">
-                  {data.contents
-                    .filter((c) => show(c) && c.title.includes(search))
-                    .sort(compareContentCreated)
-                    .map((c) => (
-                      <article className="content-card" key={c.id}>
-                        <div className="eyebrow">
-                          {data.channels.find((ch) => ch.id === c.channel_id)
-                            ?.name ?? "이전 연결 채널"}{" "}
-                          · {datePart(c.published_at) || "발행일 없음"}
-                        </div>
-                        <button
-                          className="content-title"
-                          onClick={() => setDetail(c.id)}
-                        >
-                          {c.title}
-                        </button>
-                        <p>
-                          {c.notes ||
-                            "소재 상세에서 원본 링크와 집행 이력을 관리하세요."}
-                        </p>
-                        <div className="card-stat">
-                          <span>광고 집행</span>
-                          <strong>
-                            {
-                              data.promotions.filter(
-                                (p) => p.content_id === c.id && !p.deleted_at,
-                              ).length
-                            }
-                            회
-                          </strong>
-                        </div>
-                        {lifecycleActions("contents", c)}
-                      </article>
-                    ))}
-                </div>
-                {!data.contents.some(show) && (
-                  <Empty
-                    title="표시할 소재가 없습니다."
-                    detail="소재를 추가하면 채널 템플릿에 맞는 지표 행이 준비됩니다."
-                  />
-                )}
-                <section className="panel">
-                  <div className="section-toolbar">
-                    <h2>채널과 지표 설정</h2>
-                    <button onClick={() => edit({ collection: "channels" })}>
-                      ＋ 채널 추가
-                    </button>
-                  </div>
-                  {data.channels
-                    .filter((c) =>
-                      lifecycle === "trash" ? !!c.deleted_at : !c.deleted_at,
-                    )
-                    .map((ch) => (
-                      <details className="channel-settings" key={ch.id}>
-                        <summary>
-                          <span
-                            className="channel-dot"
-                            style={{ background: ch.color ?? "#287a56" }}
-                          />
-                          {ch.name}
-                          <small>
-                            {
-                              data.metrics.filter(
-                                (m) => m.channel_id === ch.id && !m.deleted_at,
-                              ).length
-                            }
-                            개 지표
-                          </small>
-                        </summary>
-                        <div className="section-toolbar">
-                          {lifecycleActions("channels", ch)}
-                          <button
-                            onClick={() =>
-                              edit({
-                                collection: "metrics",
-                                record: { channel_id: ch.id, scope: "total" },
-                              })
-                            }
-                          >
-                            ＋ 지표 추가
-                          </button>
-                        </div>
-                        <div className="metric-list">
-                          {data.metrics
-                            .filter((m) => m.channel_id === ch.id)
-                            .sort((a, b) => a.sort_order - b.sort_order)
-                            .map((m) => (
+                <section className="content-settings-panel">
+                  <details>
+                    <summary>채널·지표 관리</summary>
+                    <div className="content-settings-head">
+                      <span>채널·지표의 측정 방식과 표시 순서를 수정합니다.</span>
+                      <button onClick={() => edit({ collection: "channels" })}>＋ 채널 추가</button>
+                    </div>
+                    {data.channels
+                      .filter((c) => lifecycle === "trash" ? !!c.deleted_at : !c.deleted_at)
+                      .map((ch) => (
+                        <details className="channel-settings" key={ch.id}>
+                          <summary>
+                            <span className="channel-dot" style={{ background: ch.color ?? "#287a56" }} />
+                            {ch.name}
+                            <small>{data.metrics.filter((m) => m.channel_id === ch.id && !m.deleted_at).length}개 지표</small>
+                          </summary>
+                          <div className="section-toolbar">
+                            {lifecycleActions("channels", ch)}
+                            <button onClick={() => edit({ collection: "metrics", record: { channel_id: ch.id, scope: "total" } })}>＋ 지표 추가</button>
+                          </div>
+                          <div className="metric-list">
+                            {data.metrics.filter((m) => m.channel_id === ch.id).sort((a, b) => a.sort_order - b.sort_order).map((m) => (
                               <div key={m.id}>
-                                <span>
-                                  <b>{m.name}</b>
-                                  <small>
-                                    {scopeLabels[m.scope]} ·{" "}
-                                    {modeLabels[m.mode]}
-                                    {m.deleted_at ? " · 휴지통" : ""}
-                                  </small>
-                                </span>
+                                <span><b>{m.name}</b><small>{scopeLabels[m.scope]} · {modeLabels[m.mode]}{m.deleted_at ? " · 휴지통" : ""}</small></span>
                                 {lifecycleActions("metrics", m)}
                               </div>
                             ))}
-                        </div>
-                      </details>
-                    ))}
-                  <details className="channel-settings">
-                    <summary>학원 전체 퍼널 지표</summary>
-                    <button
-                      onClick={() =>
-                        edit({
-                          collection: "metrics",
-                          record: { scope: "funnel" },
-                        })
-                      }
-                    >
-                      ＋ 지표 추가
-                    </button>
-                    <div className="metric-list">
-                      {data.metrics
-                        .filter((m) => m.scope === "funnel")
-                        .map((m) => (
-                          <div key={m.id}>
-                            <span>
-                              {m.name}
-                              {m.deleted_at ? " · 휴지통" : ""}
-                            </span>
-                            {lifecycleActions("metrics", m)}
                           </div>
+                        </details>
+                      ))}
+                    <details className="channel-settings">
+                      <summary>학원 전체 퍼널 지표</summary>
+                      <button onClick={() => edit({ collection: "metrics", record: { scope: "funnel" } })}>＋ 지표 추가</button>
+                      <div className="metric-list">
+                        {data.metrics.filter((m) => m.scope === "funnel").map((m) => (
+                          <div key={m.id}><span>{m.name}{m.deleted_at ? " · 휴지통" : ""}</span>{lifecycleActions("metrics", m)}</div>
                         ))}
-                    </div>
+                      </div>
+                    </details>
                   </details>
                 </section>
               </>
@@ -1844,7 +1732,7 @@ function Kpis({
         ],
       ];
   return (
-    <div className={`kpi-grid${compact ? " kpi-compact" : ""}`}>
+    <div className={`kpi-grid${compact ? " kpi-compact" : ""}`} aria-label="월간 핵심 성과">
       {cards.map(([label, value, hint], i) => (
         <article key={label} className={`kpi ${i === 3 ? "accent" : ""}`}>
           <span>{label}</span>
