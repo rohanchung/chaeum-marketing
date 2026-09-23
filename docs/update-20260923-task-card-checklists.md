@@ -15,5 +15,7 @@
 
 ## 확인
 
-- 프런트엔드 TypeScript·ESLint·단위 테스트·프로덕션 빌드 및 diff 공백 검사를 실행합니다.
-- `supabase/tests/task_checklist_items.sql`은 인증된 작업공간에서 체크 항목 생성·수정·완료·소프트 삭제를 트랜잭션 안에서 검증하고 롤백합니다.
+- TypeScript·ESLint·단위 테스트 41개·프로덕션 빌드·diff 공백 검사를 통과했습니다.
+- 전용 Supabase 프로젝트 `nwxbfmycimrxaovemela`에 `20260923094500_task_checklist_items`를 적용하고, 원격 migration history도 같은 버전·이름으로 기록했습니다.
+- 인증된 작업공간에서 체크 항목 생성·수정·완료·소프트 삭제를 트랜잭션 안에서 검증한 뒤 롤백했습니다.
+- `notify pgrst, 'reload schema'` 뒤 공개 앱 키의 PostgREST 제한 조회가 테이블을 정상 인식했습니다. 인증 없는 요청은 의도대로 `401`로 차단됐으며 스키마 캐시 미인식 오류는 없었습니다.
