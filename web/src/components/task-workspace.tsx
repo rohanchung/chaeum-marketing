@@ -5,6 +5,7 @@ import {
   Data,
   MarketingEvent,
   Task,
+  TaskChecklistItem,
   TaskPriority,
   TaskSource,
   TaskStatus,
@@ -685,6 +686,7 @@ function TaskRow({
   task,
   data,
   today,
+  serverNow,
   depth,
   dragging,
   dropPosition,
@@ -695,10 +697,17 @@ function TaskRow({
   onDragLeave,
   onDrop,
   onDragEnd,
+  checklistItems,
+  checklistOpen,
+  onChecklistOpen,
+  onChecklistAdd,
+  onChecklistUpdate,
+  onChecklistDelete,
 }: {
   task: Task;
   data: Data;
   today: string;
+  serverNow: string;
   depth: number;
   dragging: boolean;
   dropPosition: CardDropPosition | null;
@@ -709,11 +718,28 @@ function TaskRow({
   onDragLeave: () => void;
   onDrop: (event: DragEvent<HTMLElement>, task: Task) => void;
   onDragEnd: () => void;
+  checklistItems: TaskChecklistItem[];
+  checklistOpen: boolean;
+  onChecklistOpen: (task: Task) => void;
+  onChecklistAdd: (task: Task, title: string) => void;
+  onChecklistUpdate: (item: TaskChecklistItem, patch: Record<string, unknown>) => void;
+  onChecklistDelete: (item: TaskChecklistItem) => void;
 }) {
+  const [checklistDraft, setChecklistDraft] = useState("");
+  const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
+  const [editingChecklistTitle, setEditingChecklistTitle] = useState("");
   const project = data.workProjects.find((item) => item.id === task.project_id);
   const parentTask = data.tasks.find((item) => item.id === task.depends_on_task_id && !item.deleted_at);
   const due = dateOnly(task.due_at);
   const overdue = due !== null && due < today && task.status !== "done";
+  const completedChecklistCount = checklistItems.filter((item) => item.completed_at).length;
+  const stopCardAction = (event: { stopPropagation: () => void }) => event.stopPropagation();
+  const addChecklistItem = () => {
+    const title = checklistDraft.trim();
+    if (!title) return;
+    onChecklistAdd(task, title);
+    setChecklistDraft("");
+  };
   return (
     <article
       className={`task-row task-card${overdue ? " overdue" : ""}${task.status === "done" ? " done" : ""}${dragging ? " dragging" : ""}${dropPosition ? ` drop-${dropPosition}` : ""}`}
@@ -728,7 +754,13 @@ function TaskRow({
           onEdit(task);
         }
       }}
-      onDragStart={(event) => onDragStart(event, task)}
+      onDragStart={(event) => {
+        if ((event.target as HTMLElement).closest("button, input, form")) {
+          event.preventDefault();
+          return;
+        }
+        onDragStart(event, task);
+      }}
       onDragOver={(event) => onDragOver(event, task)}
       onDragLeave={onDragLeave}
       onDrop={(event) => onDrop(event, task)}
@@ -764,10 +796,114 @@ function TaskRow({
           </small>
         )}
       </div>
+      <button
+        type="button"
+        className="task-checklist-toggle"
+        aria-label={`${task.title} 세부 체크 ${checklistOpen ? "접기" : "열기"}`}
+        aria-expanded={checklistOpen}
+        onClick={(event) => {
+          stopCardAction(event);
+          onChecklistOpen(task);
+        }}
+      >
+        ＋
+        {checklistItems.length > 0 && <small>{completedChecklistCount}/{checklistItems.length}</small>}
+      </button>
       <span className="task-status">{statusLabels[task.status]}</span>
       <span className={`task-due${overdue ? " task-overdue" : ""}`}>
         {dateLabel(task.due_at ?? task.start_at, today)}
       </span>
+      {checklistOpen && (
+        <div
+          className="task-checklist"
+          onClick={stopCardAction}
+          onDragStart={(event) => event.preventDefault()}
+        >
+          {checklistItems.length > 0 && (
+            <div className="task-checklist-items">
+              {checklistItems.map((item) => {
+                const editing = editingChecklistId === item.id;
+                return (
+                  <div className={`task-checklist-item${item.completed_at ? " done" : ""}`} key={item.id}>
+                    <input
+                      type="checkbox"
+                      checked={!!item.completed_at}
+                      aria-label={`${item.title} 완료`}
+                      onChange={() => onChecklistUpdate(item, { completed_at: item.completed_at ? null : serverNow })}
+                    />
+                    {editing ? (
+                      <form
+                        className="task-checklist-edit"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          const title = editingChecklistTitle.trim();
+                          if (title) onChecklistUpdate(item, { title });
+                          setEditingChecklistId(null);
+                        }}
+                      >
+                        <input
+                          autoFocus
+                          value={editingChecklistTitle}
+                          aria-label="세부 체크 항목 수정"
+                          onChange={(event) => setEditingChecklistTitle(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setEditingChecklistId(null);
+                            }
+                          }}
+                        />
+                      </form>
+                    ) : <span>{item.title}</span>}
+                    <button
+                      type="button"
+                      className="task-checklist-edit-button"
+                      aria-label={`${item.title} 수정`}
+                      onClick={() => {
+                        setEditingChecklistId(item.id);
+                        setEditingChecklistTitle(item.title);
+                      }}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      className="task-checklist-delete"
+                      aria-label={`${item.title} 삭제`}
+                      onClick={() => {
+                        if (window.confirm(`“${item.title}” 체크 항목을 삭제할까요?`)) onChecklistDelete(item);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <form
+            className="task-checklist-create"
+            onSubmit={(event) => {
+              event.preventDefault();
+              addChecklistItem();
+            }}
+          >
+            <input
+              value={checklistDraft}
+              aria-label={`${task.title} 세부 체크 항목`}
+              placeholder="세부 체크 항목 입력"
+              onChange={(event) => setChecklistDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setChecklistDraft("");
+                }
+              }}
+            />
+            <button type="submit" disabled={!checklistDraft.trim()}>추가</button>
+          </form>
+        </div>
+      )}
     </article>
   );
 }
@@ -812,6 +948,7 @@ export function TaskWorkspace({
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [draggedListTaskId, setDraggedListTaskId] = useState<string | null>(null);
   const [listDropTarget, setListDropTarget] = useState<CardDropTarget | null>(null);
+  const [openChecklistTaskIds, setOpenChecklistTaskIds] = useState<Set<string>>(new Set());
   const calendarWheelLocked = useRef(false);
   const materialized = useMemo(
     () => materializedTasks(data, today),
@@ -1054,6 +1191,33 @@ export function TaskWorkspace({
     setNewTaskTitle(title);
     setTaskEditor(null);
   };
+  const checklistForTask = (task: Task) => data.taskChecklistItems
+    .filter((item) => !item.deleted_at && item.task_id === taskRecordId(task))
+    .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
+  const toggleChecklist = (task: Task) => {
+    const id = taskRecordId(task);
+    setOpenChecklistTaskIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const addChecklistItem = (task: Task, title: string) => {
+    const items = checklistForTask(task);
+    void onSave("taskChecklistItems", {
+      task_id: taskRecordId(task),
+      title,
+      completed_at: null,
+      sort_order: Math.max(0, ...items.map((item) => item.sort_order)) + 100,
+    });
+  };
+  const updateChecklistItem = (item: TaskChecklistItem, patch: Record<string, unknown>) => {
+    onUpdate("taskChecklistItems", item.id, { ...patch, updated_at: serverNow });
+  };
+  const deleteChecklistItem = (item: TaskChecklistItem) => {
+    onUpdate("taskChecklistItems", item.id, { deleted_at: serverNow });
+  };
   const wouldCreateTaskCycle = (taskId: string, parentId: string | null) => {
     const visited = new Set<string>();
     let currentId = parentId;
@@ -1226,6 +1390,7 @@ export function TaskWorkspace({
                   task={task}
                   data={data}
                   today={today}
+                  serverNow={serverNow}
                   depth={depth}
                   dragging={draggedListTaskId === taskRecordId(task)}
                   dropPosition={listDropTarget?.id === taskRecordId(task) ? listDropTarget.position : null}
@@ -1246,6 +1411,12 @@ export function TaskWorkspace({
                     setDraggedListTaskId(null);
                     setListDropTarget(null);
                   }}
+                  checklistItems={checklistForTask(task)}
+                  checklistOpen={openChecklistTaskIds.has(taskRecordId(task))}
+                  onChecklistOpen={toggleChecklist}
+                  onChecklistAdd={addChecklistItem}
+                  onChecklistUpdate={updateChecklistItem}
+                  onChecklistDelete={deleteChecklistItem}
                 />
               ))}
               {!dailyTasks.length && !dailyEvents.length && <div className="empty-small">이 날짜에 예정된 업무나 이벤트가 없습니다.</div>}

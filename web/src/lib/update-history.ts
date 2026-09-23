@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260923-task-card-checklists",
+    date: "2026-09-23",
+    title: "업무 카드 세부 체크리스트",
+    room: "현재 제작방",
+    changes: [
+      "업무 카드의 ＋ 버튼으로 세부 처리 체크 항목을 바로 추가할 수 있게 했습니다.",
+      "체크 항목은 카드 아래에 펼쳐지고, 완료하면 같은 위치에서 취소선으로 표시됩니다.",
+      "세부 체크 항목도 수정·삭제할 수 있으며 업무·프로젝트·일정과 분리해 저장합니다.",
+    ],
+  },
+  {
     id: "20260923-task-cards-and-hierarchy",
     date: "2026-09-23",
     title: "날짜별 업무 카드 정렬과 하위 업무 연결",

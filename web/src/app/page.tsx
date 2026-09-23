@@ -1524,6 +1524,7 @@ export default function Home() {
                             "mkt_work_areas",
                             "mkt_work_projects",
                             "mkt_tasks",
+                            "mkt_task_checklist_items",
                             "mkt_work_links",
                             "mkt_task_occurrences",
                           ] as const) {

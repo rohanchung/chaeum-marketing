@@ -2982,7 +2982,7 @@ textarea {
 }
 .task-tree .task-row.task-card {
   position: relative;
-  grid-template-columns: 12px 16px minmax(0, 1fr) auto auto;
+  grid-template-columns: 12px 16px minmax(0, 1fr) auto auto auto;
   gap: 6px;
   min-height: 66px;
   width: auto;
@@ -3044,6 +3044,100 @@ textarea {
 }
 .task-tree .task-row.task-card .task-row-main small {
   font-size: 9px;
+}
+.task-checklist-toggle {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 3px;
+  border: 1px solid #d9e6db;
+  border-radius: 4px;
+  background: #f8fbf8;
+  color: #477c57;
+  font-size: 13px;
+  line-height: 1;
+}
+.task-checklist-toggle:hover,
+.task-checklist-toggle[aria-expanded="true"] {
+  border-color: #91b99c;
+  background: #edf6ee;
+}
+.task-checklist-toggle small {
+  color: #63816b;
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.task-checklist {
+  display: grid;
+  grid-column: 2 / -1;
+  gap: 3px;
+  margin-top: -2px;
+  padding: 5px 0 0 2px;
+  border-top: 1px dashed #dfe9e0;
+}
+.task-checklist-items {
+  display: grid;
+  gap: 2px;
+}
+.task-checklist-item {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) 16px 16px;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  color: #536b5a;
+  font-size: 10px;
+}
+.task-checklist-item input[type="checkbox"] {
+  width: 12px !important;
+  height: 12px !important;
+}
+.task-checklist-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-checklist-item.done span {
+  color: #94a198;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.task-checklist-edit {
+  min-width: 0;
+}
+.task-checklist-edit input,
+.task-checklist-create input {
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  padding: 2px 5px;
+  font-size: 10px;
+}
+.task-checklist-edit-button,
+.task-checklist-delete {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #839287;
+  font-size: 11px;
+  line-height: 1;
+}
+.task-checklist-delete:hover {
+  color: #b45b4c;
+}
+.task-checklist-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+}
+.task-checklist-create button {
+  padding: 2px 6px;
+  font-size: 10px;
 }
 .next-task-composer {
   display: grid;

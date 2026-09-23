@@ -18,6 +18,7 @@ export const tables = {
   workAreas: "mkt_work_areas",
   workProjects: "mkt_work_projects",
   tasks: "mkt_tasks",
+  taskChecklistItems: "mkt_task_checklist_items",
   workLinks: "mkt_work_links",
   taskOccurrences: "mkt_task_occurrences",
 } as const;

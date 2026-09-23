@@ -212,6 +212,14 @@ export type TaskOccurrence = {
   created_at?: string;
   updated_at?: string;
 };
+export type TaskChecklistItem = Base & {
+  task_id: string;
+  title: string;
+  completed_at: string | null;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+};
 export type WorkLink = {
   id: string;
   workspace_id: string;
@@ -237,6 +245,7 @@ export type Data = {
   workAreas: WorkArea[];
   workProjects: WorkProject[];
   tasks: Task[];
+  taskChecklistItems: TaskChecklistItem[];
   workLinks: WorkLink[];
   taskOccurrences: TaskOccurrence[];
 };
@@ -256,6 +265,7 @@ export const emptyData: Data = {
   workAreas: [],
   workProjects: [],
   tasks: [],
+  taskChecklistItems: [],
   workLinks: [],
   taskOccurrences: [],
 };
