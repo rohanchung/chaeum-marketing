@@ -2980,6 +2980,104 @@ textarea {
 .task-row.done .task-due {
   color: #89988e;
 }
+.task-tree .task-row.task-card {
+  position: relative;
+  grid-template-columns: 12px 16px minmax(0, 1fr) auto auto;
+  gap: 6px;
+  min-height: 66px;
+  width: auto;
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: 4px;
+  padding: 7px;
+  border: 1px solid #e3ebe4;
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, opacity 120ms ease;
+}
+.task-tree .task-row.task-card:first-of-type {
+  border-top: 1px solid #e3ebe4;
+}
+.task-tree .task-row.task-card:hover {
+  border-color: #a8cbb0;
+  background: #fbfdfb;
+}
+.task-tree .task-row.task-card.dragging {
+  opacity: .45;
+}
+.task-tree .task-row.task-card.drop-child {
+  border-color: #4f9b70;
+  background: #edf7ef;
+}
+.task-tree .task-row.task-card.drop-before::before,
+.task-tree .task-row.task-card.drop-after::after {
+  position: absolute;
+  right: 3px;
+  left: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: #287a56;
+  content: "";
+}
+.task-tree .task-row.task-card.drop-before::before {
+  top: -3px;
+}
+.task-tree .task-row.task-card.drop-after::after {
+  bottom: -3px;
+}
+.task-card-handle {
+  align-self: center;
+  color: #9cad9f;
+  font-size: 13px;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+.task-tree .task-row.task-card input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  align-self: center;
+}
+.task-tree .task-row.task-card .task-row-main strong {
+  font-size: 12px;
+}
+.task-tree .task-row.task-card .task-row-main small {
+  font-size: 9px;
+}
+.next-task-composer {
+  display: grid;
+  gap: 5px;
+  margin: 2px 0 9px;
+  padding: 8px 9px;
+  border: 1px solid #dce9de;
+  border-radius: 6px;
+  background: #f8fbf8;
+}
+.next-task-composer > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.next-task-composer strong {
+  font-size: 11px;
+}
+.next-task-composer small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.next-task-composer-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+}
+.next-task-composer-input input,
+.next-task-composer-input button {
+  min-width: 0;
+  padding: 5px 7px;
+  font-size: 10px;
+}
 .task-event-row {
   display: grid;
   grid-template-columns: 8px minmax(0, 1fr) auto;

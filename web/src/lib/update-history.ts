@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260923-task-cards-and-hierarchy",
+    date: "2026-09-23",
+    title: "날짜별 업무 카드 정렬과 하위 업무 연결",
+    room: "현재 제작방",
+    changes: [
+      "선택 날짜 업무를 클릭 가능한 카드로 바꾸고, 카드 전체를 눌러 업무 상세를 열 수 있게 했습니다.",
+      "카드 위·아래 드롭으로 순서를 바꾸고, 카드 중앙 드롭으로 하위 업무를 만드는 드래그 흐름을 추가했습니다.",
+      "업무 상세 하단의 다음 업무 입력을 새 하위 업무 생성으로 연결했습니다.",
+    ],
+  },
+  {
     id: "20260922-workspace-crud-audit",
     date: "2026-09-22",
     title: "업무·프로젝트·이벤트 삭제 흐름 보완",
