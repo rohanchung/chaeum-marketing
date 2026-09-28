@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260928-task-calendar-height-review",
+    date: "2026-09-28",
+    title: "업무 캘린더 5주차 검수 수정",
+    room: "현재 제작방",
+    changes: [
+      "캘린더 바깥 레이아웃이 내부 높이를 축소하던 충돌을 제거해 5주차 27~30일을 같은 캔버스 안에 유지했습니다.",
+      "주별 최소 높이를 66px 이상으로 보장해 28일처럼 같은 날에 여러 업무가 있어도 날짜와 일정 바가 겹치지 않게 했습니다.",
+      "업무·프로젝트·이벤트 데이터와 저장 구조는 변경하지 않았습니다.",
+    ],
+  },
+  {
     id: "20260928-task-calendar-final-week",
     date: "2026-09-28",
     title: "업무 캘린더 마지막 주 표시 보완",

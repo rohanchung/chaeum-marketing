@@ -4024,34 +4024,15 @@ textarea {
   }
 }
 
-/* The task page owns the remaining viewport. An empty shared toolbar previously
-   consumed a row, leaving the final calendar week outside the visible canvas. */
-.task-page > .toolbar:empty {
-  display: none;
-}
+/* Keep all month weeks in one calendar canvas. The calendar grid itself owns
+   the height; do not turn its parent into a flex shrink container. */
 @media (min-width: 761px) {
-  .task-page .work-page {
-    display: flex;
-    flex-direction: column;
-    min-height: calc(100dvh - 102px);
-  }
-  .task-page .work-layout,
-  .task-page .work-main,
   .task-page .work-overview-grid {
-    display: flex;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-  .task-page .work-overview-grid {
-    display: grid;
-    height: auto;
-  }
-  .task-page .task-calendar {
-    min-height: 0;
+    height: calc(100dvh - 128px);
+    min-height: 560px;
   }
   .task-page .calendar-main .calendar-grid {
-    height: auto;
-    min-height: 0;
-    flex: 1 1 0;
+    height: calc(100dvh - 190px);
+    min-height: 500px;
   }
 }
