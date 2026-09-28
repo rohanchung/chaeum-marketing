@@ -10,6 +10,19 @@ export type Channel = Base & {
   measurement_template: string;
   is_active: boolean;
 };
+const normalizedChannelName = (name: string) =>
+  name.trim().replace(/\s+/g, " ").toLocaleLowerCase("ko-KR");
+export function channelNameConflict(
+  channels: Channel[],
+  name: string,
+  exceptId?: string | null,
+) {
+  const target = normalizedChannelName(name);
+  if (!target) return null;
+  return channels.find(
+    (channel) => channel.id !== exceptId && normalizedChannelName(channel.name) === target,
+  ) ?? null;
+}
 export type Content = Base & {
   created_at?: string;
   keyword_metric_ids?: string[] | null;

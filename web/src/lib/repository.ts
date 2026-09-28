@@ -158,7 +158,12 @@ export async function saveChannel(
     p_channel: channel,
     p_metrics: metricTemplate(String(channel.measurement_template)),
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/channels_workspace_id_name_key|duplicate key value/i.test(error.message)) {
+      throw new Error("같은 이름의 채널이 이미 있습니다. 기존 채널을 수정하거나 다른 이름을 입력하세요.");
+    }
+    throw new Error(error.message);
+  }
 }
 export async function saveAdContent(
   workspace: string,

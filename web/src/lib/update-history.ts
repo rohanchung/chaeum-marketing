@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260928-channel-name-validation",
+    date: "2026-09-28",
+    title: "채널명 중복 저장 안내",
+    room: "현재 제작방",
+    changes: [
+      "채널을 저장하기 전에 같은 이름을 검사하고, 기존 채널을 수정하거나 다른 이름을 입력하도록 안내합니다.",
+      "휴지통에 같은 이름이 있는 경우에는 복원 또는 이름 변경을 안내합니다.",
+      "동시 저장 등으로 서버의 중복 제약이 발생해도 SQL 오류 대신 같은 한국어 안내를 표시합니다.",
+    ],
+  },
+  {
     id: "20260928-recurring-calendar-occurrences",
     date: "2026-09-28",
     title: "반복 업무 월간 회차 표시",

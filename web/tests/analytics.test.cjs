@@ -12,13 +12,23 @@ require.extensions[".ts"] = (module, file) =>
     }).outputText,
     file,
   );
-const { emptyData, metricTemplate, dates } = require("../src/lib/domain.ts");
+const { emptyData, metricTemplate, dates, channelNameConflict } = require("../src/lib/domain.ts");
 const { metricValue, summary, report } = require("../src/lib/analytics.ts");
 const {
   printableHTML,
   downloadExcelReport,
 } = require("../src/lib/report-export.ts");
 const period = { start: "2026-09-01", end: "2026-09-30" };
+test("채널 추가는 기존 채널과 휴지통 채널의 같은 이름을 저장 전에 구분한다", () => {
+  const channels = [
+    { id: "instagram", name: "인스타그램", deleted_at: null },
+    { id: "bitly", name: "비틀리", deleted_at: "2026-09-01T00:00:00Z" },
+  ];
+  assert.equal(channelNameConflict(channels, " 인스타그램 ")?.id, "instagram");
+  assert.equal(channelNameConflict(channels, "비틀리")?.id, "bitly");
+  assert.equal(channelNameConflict(channels, "인스타그램", "instagram"), null);
+  assert.equal(channelNameConflict(channels, "네이버"), null);
+});
 test("소재는 발행일이나 ID가 아닌 등록일 과거순이며 같은 시각도 안정적으로 정렬한다", () => {
   const { compareContentCreated } = require("../src/lib/domain.ts");
   const contents = [

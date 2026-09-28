@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import {
+  channelNameConflict,
   Data,
   Source,
   datePart,
@@ -203,15 +204,25 @@ export function Editor({
       notes: nullable("notes"),
     };
     try {
-      if (collection === "channels")
+      if (collection === "channels") {
+        const name = get("name");
+        const existing = channelNameConflict(data.channels, name, recordId);
+        if (existing) {
+          throw new Error(
+            existing.deleted_at
+              ? `“${name}” 채널은 휴지통에 있습니다. 복원하거나 다른 이름을 입력하세요.`
+              : `“${name}” 채널이 이미 있습니다. 기존 채널을 수정하거나 다른 이름을 입력하세요.`,
+          );
+        }
         patch = {
           ...patch,
-          name: get("name"),
+          name,
           color: get("color"),
           measurement_template: get("measurement_template"),
           channel_type: "other",
           is_active: true,
         };
+      }
       if (collection === "contents") {
         patch = {
           ...patch,
