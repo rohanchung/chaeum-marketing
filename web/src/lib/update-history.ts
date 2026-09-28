@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260928-task-create-default-date",
+    date: "2026-09-28",
+    title: "상단 업무 추가의 오늘 일정 기본값",
+    room: "현재 제작방",
+    changes: [
+      "상단 업무 추가는 실행 예정일과 마감일을 오늘로 시작해 날짜를 따로 입력하지 않아도 바로 저장·표시됩니다.",
+      "새 업무에서 날짜를 비우고 저장해도 오늘 실행 업무로 보정하며, 한쪽 날짜만 입력하면 다른 날짜도 같은 날로 맞춥니다.",
+      "기존에 날짜가 없는 업무를 수정할 때는 날짜를 임의로 채우지 않습니다.",
+    ],
+  },
+  {
     id: "20260928-task-calendar-height-review",
     date: "2026-09-28",
     title: "업무 캘린더 5주차 검수 수정",

@@ -329,8 +329,12 @@ export function TaskForm({
     if (!title.trim()) return;
     const project = projects.find((item) => item.id === projectId);
     const recurring = sourceType === "recurring";
-    const normalizedStart = recurring ? startOn || today : startOn;
-    const normalizedDue = recurring ? dueOn || normalizedStart : dueOn;
+    // A task created from the global action needs a calendar home even when the
+    // user does not touch either date field. Existing undated records can stay
+    // undated when they are edited.
+    const defaultStart = task ? "" : today;
+    const normalizedStart = recurring ? startOn || today : startOn || dueOn || defaultStart;
+    const normalizedDue = recurring ? dueOn || normalizedStart : dueOn || normalizedStart;
     const recurrenceNextOn = recurring
       ? (task?.recurrence_next_on ?? normalizedStart) || today
       : null;
@@ -458,11 +462,11 @@ export function TaskForm({
         )}
         <div className="form-pair">
           <label className="form-field">
-            <span>실행 예정일</span>
+            <span>실행 예정일{!task ? " · 비우면 오늘" : ""}</span>
             <input type="date" value={startOn} onChange={(event) => setStartOn(event.target.value)} />
           </label>
           <label className="form-field">
-            <span>마감일</span>
+            <span>마감일{!task ? " · 비우면 실행일" : ""}</span>
             <input type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} />
           </label>
         </div>
@@ -1319,7 +1323,7 @@ export function TaskWorkspace({
           <button onClick={() => setCalendarMonth(today.slice(0, 7))}>오늘</button>
           <span className="task-clock">한국 {koreanClock(serverNow)}</span>
           <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
-          <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(""); setNewTaskParentId(""); setNewTaskTitle(""); setTaskEditor(null); }}>＋ 업무</button>
+          <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(today); setNewTaskParentId(""); setNewTaskTitle(""); setTaskEditor(null); }}>＋ 업무</button>
         </div>
       </div>
       <div className="work-layout">
