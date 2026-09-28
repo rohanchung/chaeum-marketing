@@ -22,6 +22,20 @@ export function nextTaskOccurrence(task: Task, occurrenceOn: string) {
   return task.recurrence_until && result > task.recurrence_until ? null : result;
 }
 
+/** Returns the unsaved recurrence instances that belong in the requested calendar range. */
+export function recurringDatesInRange(task: Task, start: string, end: string) {
+  if (!task.recurrence_frequency || !task.recurrence_active) return [];
+  let occurrenceOn = task.recurrence_next_on ?? task.start_at?.slice(0, 10) ?? null;
+  const result: string[] = [];
+  let safety = 0;
+  while (occurrenceOn && occurrenceOn <= end && safety < 10_000) {
+    if (occurrenceOn >= start) result.push(occurrenceOn);
+    occurrenceOn = nextTaskOccurrence(task, occurrenceOn);
+    safety += 1;
+  }
+  return result;
+}
+
 export function recurrenceText(task: Task) {
   if (!task.recurrence_frequency) return "";
   const unit = task.recurrence_frequency === "daily"

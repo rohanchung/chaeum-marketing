@@ -9,6 +9,28 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260928-recurring-calendar-occurrences",
+    date: "2026-09-28",
+    title: "반복 업무 월간 회차 표시",
+    room: "현재 제작방",
+    changes: [
+      "반복 업무는 다음 1회만 표시하지 않고, 현재 보고 있는 달의 모든 예정 회차를 캘린더와 일자별 업무 목록에 표시합니다.",
+      "매일·N일마다·매주·매월 규칙과 종료일을 같은 방식으로 월간 화면에 적용합니다.",
+      "미래 반복 회차는 체크해 앞선 회차를 건너뛸 수 없도록 완료 동작을 막았습니다.",
+    ],
+  },
+  {
+    id: "20260928-task-calendar-fluid-height",
+    date: "2026-09-28",
+    title: "업무 캘린더 화면 높이 반응형 조정",
+    room: "현재 제작방",
+    changes: [
+      "업무 화면이 브라우저의 남은 높이를 직접 사용하도록 정리해 월별 마지막 행이 창 밖으로 밀리지 않게 했습니다.",
+      "5주·6주 달은 모든 주가 남은 높이를 나눠 쓰고, 일정 바가 많은 달만 캘린더 안에서 스크롤할 수 있습니다.",
+      "오른쪽 선택일 업무 목록도 같은 높이 안에서 독립적으로 스크롤됩니다.",
+    ],
+  },
+  {
     id: "20260928-task-create-default-date",
     date: "2026-09-28",
     title: "상단 업무 추가의 오늘 일정 기본값",

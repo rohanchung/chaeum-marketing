@@ -16,7 +16,7 @@ import {
   timestamp,
 } from "@/lib/domain";
 import { Collection } from "@/lib/repository";
-import { recurrenceText } from "@/lib/task-recurrence";
+import { recurringDatesInRange, recurrenceText } from "@/lib/task-recurrence";
 
 type Save = (collection: Collection, record: Record<string, unknown>) => Promise<void>;
 type Update = (
@@ -98,7 +98,11 @@ const taskRecordId = (task: Task) => task.recurrence_template_id ?? task.id;
 type CardDropPosition = "before" | "after" | "child";
 type CardDropTarget = { id: string; position: CardDropPosition };
 
-export function materializedTasks(data: Data, today: string): Task[] {
+export function materializedTasks(
+  data: Data,
+  today: string,
+  calendarRange?: { start: string; end: string },
+): Task[] {
   const occurrences = new Map(
     data.taskOccurrences.map((occurrence) => [
       `${occurrence.task_id}:${occurrence.occurrence_on}`,
@@ -109,18 +113,23 @@ export function materializedTasks(data: Data, today: string): Task[] {
     .filter((task) => !task.deleted_at)
     .flatMap((task): Task[] => {
       if (task.source_type !== "recurring" || !task.recurrence_active) return [task];
-      const occurrenceOn = task.recurrence_next_on ?? dateOnly(task.start_at) ?? today;
-      const occurrence = occurrences.get(`${task.id}:${occurrenceOn}`);
-      return [{
-        ...task,
-        id: `${task.id}:${occurrenceOn}`,
-        recurrence_template_id: task.id,
-        occurrence_on: occurrenceOn,
-        start_at: timestamp(occurrenceOn),
-        due_at: dueTimestamp(occurrenceOn),
-        status: (occurrence?.status === "done" ? "done" : "planned") as TaskStatus,
-        completed_at: occurrence?.completed_at ?? null,
-      } as Task];
+      const nextOn = task.recurrence_next_on ?? dateOnly(task.start_at) ?? today;
+      const occurrenceDates = calendarRange
+        ? recurringDatesInRange(task, calendarRange.start, calendarRange.end)
+        : [nextOn];
+      return occurrenceDates.map((occurrenceOn) => {
+        const occurrence = occurrences.get(`${task.id}:${occurrenceOn}`);
+        return {
+          ...task,
+          id: `${task.id}:${occurrenceOn}`,
+          recurrence_template_id: task.id,
+          occurrence_on: occurrenceOn,
+          start_at: timestamp(occurrenceOn),
+          due_at: dueTimestamp(occurrenceOn),
+          status: (occurrence?.status === "done" ? "done" : "planned") as TaskStatus,
+          completed_at: occurrence?.completed_at ?? null,
+        } as Task;
+      });
     });
 }
 
@@ -955,8 +964,8 @@ export function TaskWorkspace({
   const [openChecklistTaskIds, setOpenChecklistTaskIds] = useState<Set<string>>(new Set());
   const calendarWheelLocked = useRef(false);
   const materialized = useMemo(
-    () => materializedTasks(data, today),
-    [data, today],
+    () => materializedTasks(data, today, monthPeriod(month)),
+    [data, today, month],
   );
   const visibleTasks = useMemo(() => {
     const tasks = filters.length
@@ -979,6 +988,7 @@ export function TaskWorkspace({
   }, [materialized, filters, today]);
   const toggle = (task: Task) => {
     if (task.recurrence_template_id && task.occurrence_on && onCompleteRecurring) {
+      if (task.occurrence_on > today) return;
       void Promise.resolve(onCompleteRecurring(task, task.status !== "done")).catch(() => {});
       return;
     }

@@ -4024,15 +4024,36 @@ textarea {
   }
 }
 
-/* Keep all month weeks in one calendar canvas. The calendar grid itself owns
-   the height; do not turn its parent into a flex shrink container. */
+/* The task workspace fills the viewport. Calendar rows share the remaining
+   height, while an exceptionally busy month scrolls inside its own canvas. */
 @media (min-width: 761px) {
+  .workspace.task-page {
+    display: flex;
+    height: calc(100dvh - 60px);
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .task-page .work-page,
+  .task-page .work-layout,
+  .task-page .work-main {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
   .task-page .work-overview-grid {
-    height: calc(100dvh - 128px);
-    min-height: 560px;
+    height: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  .task-page .task-calendar,
+  .task-page .task-tree {
+    min-height: 0;
   }
   .task-page .calendar-main .calendar-grid {
-    height: calc(100dvh - 190px);
-    min-height: 500px;
+    height: auto;
+    min-height: 0;
+    overflow-y: auto;
   }
 }
