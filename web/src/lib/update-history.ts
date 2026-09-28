@@ -9,6 +9,17 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260928-task-calendar-final-week",
+    date: "2026-09-28",
+    title: "업무 캘린더 마지막 주 표시 보완",
+    room: "현재 제작방",
+    changes: [
+      "업무 화면에 남아 있던 빈 공용 도구 행을 제거해 캘린더가 사용할 수 있는 세로 공간을 되돌렸습니다.",
+      "캘린더가 남은 화면 높이를 직접 채우도록 정리해 마지막 주의 날짜와 업무 바가 함께 보이게 했습니다.",
+      "주별 최소 높이를 일정 바 수에 맞춰 계산해 28~30일처럼 마지막 주에 기록한 업무도 잘리지 않게 했습니다.",
+    ],
+  },
+  {
     id: "20260923-dashboard-task-content-ui",
     date: "2026-09-23",
     title: "대시보드·업무·콘텐츠 운영 화면 정리",

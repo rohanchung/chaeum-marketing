@@ -1330,7 +1330,7 @@ export function TaskWorkspace({
               <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
               <div className="calendar-grid" onWheel={handleCalendarWheel}>
                 {calendarWeeks.map(({ week, bars, laneCount }, weekIndex) => (
-                  <div className="calendar-week" key={`week-${weekIndex}`} style={{ minHeight: `${Math.max(96, 21 + laneCount * 19)}px` }}>
+                  <div className="calendar-week" key={`week-${weekIndex}`} style={{ minHeight: `${Math.max(58, 20 + laneCount * 19)}px` }}>
                     <div className="calendar-days">
                       {week.map((day, index) => <div className={`${day ? "calendar-day" : "calendar-day calendar-day-outside"}${day === today ? " today" : ""}${day === selectedDate ? " selected" : ""}${day && dragOverDate === day ? " drag-over" : ""}`} key={day ?? `outside-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)} onDragOver={(event) => { if (day && draggedTaskId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDragOverDate(day); } }} onDragLeave={() => day && dragOverDate === day && setDragOverDate(null)} onDrop={(event) => { if (!day) return; event.preventDefault(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; if (taskId) moveTaskToDate(taskId, day); }}>
                         {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>

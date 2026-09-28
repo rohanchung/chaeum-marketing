@@ -557,9 +557,9 @@ export default function Home() {
           로그아웃 ↗
         </button>
       </header>
-      <div className={`workspace${nav === "대시보드" ? " dashboard-page" : nav === "콘텐츠" ? " content-page" : ""}`}>
-        <div className={`toolbar${nav === "대시보드" ? " dashboard-toolbar" : ""}`}>
-          {nav !== "업무" && nav !== "콘텐츠" && <div className="status" role="status">
+      <div className={`workspace${nav === "대시보드" ? " dashboard-page" : nav === "콘텐츠" ? " content-page" : nav === "업무" ? " task-page" : ""}`}>
+        {nav !== "업무" && nav !== "콘텐츠" && <div className={`toolbar${nav === "대시보드" ? " dashboard-toolbar" : ""}`}>
+          <div className="status" role="status">
               <i className={error ? "error" : busy ? "pending" : ""} />
               {busy
                 ? "저장·조회 중…"
@@ -568,10 +568,10 @@ export default function Home() {
                   : ready
                     ? `마지막 저장 ${datePart(lastSavedAt ?? serverNow).slice(5).replace("-", "/")} ${koreanClock(lastSavedAt ?? serverNow)}`
                     : "데이터 확인 필요"}
-            </div>}
-          {nav !== "로그" && nav !== "업무" && nav !== "콘텐츠" && (
+          </div>
+          {nav !== "로그" && (
             <div className="toolbar-controls">
-              {nav !== "대시보드" && nav !== "업무" && (
+              {nav !== "대시보드" && (
                 <div className="segmented">
                   {[
                     ["day", "일"],
@@ -662,7 +662,7 @@ export default function Home() {
               )}
             </div>
           )}
-        </div>
+        </div>}
         {error && (
           <div className="error-box" role="alert">
             <strong>작업을 확인해 주세요.</strong> {error}{" "}
