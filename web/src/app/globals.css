@@ -471,7 +471,7 @@ a:hover {
   font-size: 13px;
 }
 .row-name small {
-  font-size: 9px;
+  font-size: 11px;
   color: #97a293;
   white-space: nowrap;
   overflow: hidden;
@@ -536,7 +536,7 @@ a:hover {
   border-radius: 50%;
 }
 .sheet-help {
-  font-size: 10px;
+  font-size: 11px;
   color: #889781;
   padding: 11px 18px;
   letter-spacing: 0.1px;
@@ -550,7 +550,7 @@ a:hover {
 }
 .page-title small,
 .eyebrow {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 1.4px;
   color: #64866c;
   font-weight: 600;
@@ -684,7 +684,7 @@ a:hover {
 }
 .metric-list small {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 2px;
 }
 .data-table-wrap {
@@ -717,7 +717,7 @@ a:hover {
 }
 .data-table td small {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 3px;
 }
 .empty {
@@ -802,7 +802,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: 11px;
   color: #87957b;
 }
 .chart-legend i {
@@ -840,7 +840,7 @@ a:hover {
   font-weight: 500;
 }
 .funnel-panel > p {
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 10px;
 }
 .funnel-foot {
@@ -856,7 +856,7 @@ a:hover {
 }
 .funnel-foot small {
   width: 100%;
-  font-size: 9px;
+  font-size: 11px;
 }
 .coverage {
   display: flex;
@@ -937,7 +937,7 @@ a:hover {
   min-height: 0;
   height: 17px;
   padding: 0 1px;
-  font-size: 10px;
+  font-size: 11px;
   border: 0;
   background: transparent;
 }
@@ -994,7 +994,7 @@ a:hover {
   white-space: nowrap;
   color: #287a56;
   background: #e6f3ec;
-  font-size: 10px;
+  font-size: 11px;
 }
 .task-day-count {
   display: inline-grid;
@@ -1005,7 +1005,7 @@ a:hover {
   border-radius: 50%;
   background: #e7f1e9;
   color: #287a56;
-  font-size: 8px;
+  font-size: 11px;
   font-style: normal;
   line-height: 1;
 }
@@ -1048,7 +1048,7 @@ a:hover {
   font-weight: 550;
 }
 .day-task-item small {
-  font-size: 10px;
+  font-size: 11px;
 }
 .day-activity-empty {
   padding: 4px 0;
@@ -1101,7 +1101,7 @@ a:hover {
 .editor header small,
 .detail-panel header small {
   letter-spacing: 1px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .editor header h2,
 .detail-panel header h2 {
@@ -1239,7 +1239,7 @@ a:hover {
   display: block;
   margin: 22px 0 10px;
   letter-spacing: 2px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .login-screen h1 {
   font-size: 30px;
@@ -1327,7 +1327,7 @@ a:hover {
     padding: 0 8px;
   }
   .logout {
-    font-size: 10px;
+    font-size: 11px;
   }
   .workspace {
     padding: 18px 12px;
@@ -1412,7 +1412,7 @@ a:hover {
     padding: 22px;
   }
   .sheet-help {
-    font-size: 9px;
+    font-size: 11px;
   }
   .sheet-scroll {
     max-height: 65vh;
@@ -1478,7 +1478,7 @@ a:hover {
   background: #fafcf9;
   color: #405b48;
   text-align: left;
-  font-size: 10px;
+  font-size: 11px;
 }
 @media (max-width: 900px) {
   .work-overview-grid {
@@ -1507,7 +1507,7 @@ a:hover {
 }
 .work-view-note {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 .work-layout {
   display: block;
@@ -1557,7 +1557,7 @@ a:hover {
   color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 11px;
 }
 .project-disclosure {
   width: 12px;
@@ -1574,12 +1574,12 @@ a:hover {
   border: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 .project-tree-empty {
   margin: 0 0 5px 22px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 .unassigned-group {
   margin-top: 3px;
@@ -1595,13 +1595,13 @@ a:hover {
   gap: 4px 9px;
   margin-top: 2px;
   color: #7c8e82;
-  font-size: 9px;
+  font-size: 11px;
 }
 .task-dependency {
   display: block;
   margin-top: 2px;
   color: #6d8875;
-  font-size: 9px;
+  font-size: 11px;
 }
 .task-dependency.blocked,
 .task-status.blocked {
@@ -1647,7 +1647,7 @@ a:hover {
 .timeline-project-head small,
 .timeline-project-head em {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   font-style: normal;
 }
 .timeline-project-head > i {
@@ -1677,7 +1677,7 @@ a:hover {
   background: #fafcf9;
   color: #405b48;
   text-align: left;
-  font-size: 10px;
+  font-size: 11px;
 }
 .timeline-task span {
   overflow: hidden;
@@ -1688,7 +1688,7 @@ a:hover {
 .timeline-more {
   flex: 0 0 auto;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 .timeline-more {
   display: block;
@@ -1814,7 +1814,7 @@ textarea {
   grid-row: 1 / 3;
 }
 .kpi-compact .kpi > small {
-  font-size: 9px;
+  font-size: 11px;
   grid-column: 1;
   line-height: 1.3;
 }
@@ -1846,7 +1846,7 @@ textarea {
 .today-status {
   margin-left: 9px;
   font-weight: 400;
-  font-size: 10px;
+  font-size: 11px;
 }
 .sheet-scroll {
   max-height: calc(100dvh - 195px);
@@ -1909,7 +1909,7 @@ textarea {
   font-size: 12px;
 }
 .operating-sheet .row-name small {
-  font-size: 9px;
+  font-size: 11px;
 }
 .operating-sheet td input {
   height: 26px;
@@ -1940,7 +1940,7 @@ textarea {
 }
 .sheet-help {
   padding: 4px 8px;
-  font-size: 9px;
+  font-size: 11px;
 }
 .page-title {
   margin: 5px 0 10px;
@@ -2230,12 +2230,12 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: 11px;
 }
 .today-activity-item > span,
 .task-due {
   white-space: nowrap;
-  font-size: 10px;
+  font-size: 11px;
   color: #63786a;
 }
 .today-activity-empty {
@@ -2284,7 +2284,7 @@ textarea {
 .project-summary-card span,
 .project-summary-card small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 .work-page .page-title {
   margin-bottom: 8px;
@@ -2341,7 +2341,7 @@ textarea {
   font-size: 11px;
 }
 .project-filter small {
-  font-size: 9px;
+  font-size: 11px;
 }
 .project-header {
   display: flex;
@@ -2354,7 +2354,7 @@ textarea {
 }
 .project-header p {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 .project-links {
   margin-bottom: 8px;
@@ -2385,7 +2385,7 @@ textarea {
 }
 .project-link-row > span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 .project-link-row > strong {
   overflow: hidden;
@@ -2398,14 +2398,14 @@ textarea {
   border: 0;
   background: transparent;
   color: #9a776d;
-  font-size: 10px;
+  font-size: 11px;
 }
 .project-status {
   padding: 2px 5px;
   border-radius: 4px;
   background: #e9f3eb;
   color: #33744f;
-  font-size: 10px;
+  font-size: 11px;
 }
 .project-status.paused {
   background: #fff2df;
@@ -2452,7 +2452,7 @@ textarea {
 }
 .task-status {
   color: #6b7c71;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .task-editor {
@@ -2485,7 +2485,7 @@ textarea {
 }
 .recurrence-heading small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 .timeline-project {
   display: grid;
@@ -2512,7 +2512,7 @@ textarea {
 .timeline-project small,
 .timeline-project em {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   font-style: normal;
 }
 .timeline-project > i {
@@ -2539,7 +2539,7 @@ textarea {
 .calendar-weekdays b {
   padding: 2px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   text-align: center;
 }
 .calendar-day {
@@ -2571,7 +2571,7 @@ textarea {
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 11px;
 }
 @media (max-width: 760px) {
   .work-filters {
@@ -2666,7 +2666,7 @@ textarea {
   background: #fafcf9;
   color: #405b48;
   text-align: left;
-  font-size: 10px;
+  font-size: 11px;
 }
 @media (max-width: 900px) {
   .work-overview-grid {
@@ -2714,7 +2714,7 @@ textarea {
 }
 .calendar-main .section-toolbar small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 .calendar-task {
   display: block;
@@ -2730,7 +2730,7 @@ textarea {
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 11px;
 }
 .calendar-task.continues {
   border-left-color: #a7c8ae;
@@ -2741,7 +2741,7 @@ textarea {
   display: block;
   margin-top: 3px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 @media (max-width: 900px) {
   .work-overview-grid {
@@ -2789,7 +2789,7 @@ textarea {
   text-align: left;
 }
 .calendar-day-add b {
-  font-size: 10px;
+  font-size: 11px;
 }
 .calendar-day-add span {
   color: #82a08a;
@@ -2832,7 +2832,7 @@ textarea {
 }
 .task-2l-leading .task-filters button {
   padding: 4px 7px;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .task-2l-tools {
@@ -2848,19 +2848,19 @@ textarea {
 }
 .task-2l-tools button {
   padding: 4px 7px;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .task-clock {
   margin: 0 3px 0 5px;
   color: #557261;
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .task-project-label {
   color: #557d63 !important;
-  font-size: 9px !important;
+  font-size: 11px !important;
 }
 .work-filters {
   display: flex;
@@ -2877,7 +2877,7 @@ textarea {
 }
 .work-filters .segmented button {
   padding: 4px 7px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .work-filters .segmented .project-filter {
   display: inline-flex;
@@ -2893,7 +2893,7 @@ textarea {
 .task-sync-status {
   margin-left: 8px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .calendar-days,
@@ -2927,7 +2927,7 @@ textarea {
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 14px;
   font-weight: 650;
   pointer-events: auto;
@@ -3027,7 +3027,7 @@ textarea {
   font-size: 12px;
 }
 .task-tree .task-row.task-card .task-row-main small {
-  font-size: 9px;
+  font-size: 11px;
 }
 .task-checklist-toggle {
   display: inline-flex;
@@ -3051,7 +3051,7 @@ textarea {
 }
 .task-checklist-toggle small {
   color: #63816b;
-  font-size: 8px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 .task-checklist {
@@ -3073,7 +3073,7 @@ textarea {
   gap: 4px;
   min-height: 20px;
   color: #536b5a;
-  font-size: 10px;
+  font-size: 11px;
 }
 .task-checklist-item input[type="checkbox"] {
   width: 12px !important;
@@ -3098,7 +3098,7 @@ textarea {
   min-width: 0;
   height: 22px;
   padding: 2px 5px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .task-checklist-edit-button,
 .task-checklist-delete {
@@ -3121,7 +3121,7 @@ textarea {
 }
 .task-checklist-create button {
   padding: 2px 6px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .next-task-composer {
   display: grid;
@@ -3143,7 +3143,7 @@ textarea {
 }
 .next-task-composer small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 .next-task-composer-input {
   display: grid;
@@ -3154,7 +3154,7 @@ textarea {
 .next-task-composer-input button {
   min-width: 0;
   padding: 5px 7px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .task-event-row {
   display: grid;
@@ -3184,7 +3184,7 @@ textarea {
 .task-event-row small {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 .calendar-day.selected {
   box-shadow: inset 0 0 0 2px #78ad87;
@@ -3204,11 +3204,11 @@ textarea {
 }
 .color-input-row code {
   color: #4c6355;
-  font-size: 10px;
+  font-size: 11px;
 }
 .color-input-row small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 @media (max-width: 760px) {
   .task-2l {
@@ -3319,7 +3319,7 @@ textarea {
   border-right: 0;
 }
 .kpi-compact .kpi > span {
-  font-size: 10px;
+  font-size: 11px;
   color: #6b7f70;
   font-weight: 600;
 }
@@ -3334,7 +3334,7 @@ textarea {
   color: #93a096;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 11px;
 }
 .kpi-compact .kpi.accent {
   background: #f0f7ef;
@@ -3357,7 +3357,7 @@ textarea {
 }
 .dashboard-workspace .today-status {
   color: #728574;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 400;
 }
 .dashboard-workspace .sheet-tools > div {
@@ -3367,7 +3367,7 @@ textarea {
 .dashboard-workspace .sheet-tools summary {
   min-height: 25px;
   padding: 3px 7px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .dashboard-workspace .inline-tools {
   align-items: center;
@@ -3409,12 +3409,12 @@ textarea {
   height: 36px;
 }
 .dashboard-workspace .row-name small {
-  font-size: 8px;
+  font-size: 11px;
 }
 .dashboard-workspace .event-marker {
   min-height: 20px;
   padding: 2px 4px;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 /* Content library ---------------------------------------------------------- */
@@ -3446,7 +3446,7 @@ textarea {
 }
 .content-library-sync {
   color: #5d8067;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .content-library-controls {
@@ -3459,7 +3459,7 @@ textarea {
 .content-period-controls input {
   min-height: 30px;
   padding: 4px 8px;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .content-lifecycle {
@@ -3488,7 +3488,7 @@ textarea {
   padding: 0;
   border: 0;
   background: transparent;
-  font-size: 10px;
+  font-size: 11px;
 }
 .content-search input:focus {
   outline: 0;
@@ -3520,7 +3520,7 @@ textarea {
 .content-library-panel-head small,
 .content-library-panel-head > span {
   color: #829083;
-  font-size: 9px;
+  font-size: 11px;
 }
 .content-table-scroll {
   overflow: auto;
@@ -3553,7 +3553,7 @@ textarea {
   height: 33px;
   background: #f7f9f6;
   color: #718174;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 650;
   text-align: left;
 }
@@ -3609,7 +3609,7 @@ textarea {
 }
 .content-channel-group small {
   color: #6e8474;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
 }
 .content-channel-caret {
@@ -3640,7 +3640,7 @@ textarea {
 .content-status {
   gap: 5px;
   color: #397150;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .content-status i {
@@ -3688,7 +3688,7 @@ textarea {
   color: #8b978d;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 400;
 }
 .content-channel-name {
@@ -3697,7 +3697,7 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #4d6353;
-  font-size: 10px;
+  font-size: 11px;
 }
 .content-table select {
   width: 100%;
@@ -3706,7 +3706,7 @@ textarea {
   border-color: #dbe5dc;
   border-radius: 5px;
   background-color: #fff;
-  font-size: 9px;
+  font-size: 11px;
 }
 .content-value {
   color: #263f2d;
@@ -3734,7 +3734,7 @@ textarea {
   padding: 0 12px;
   border-right: 1px solid #e8efea;
   color: #536759;
-  font-size: 10px;
+  font-size: 11px;
 }
 .content-metric-strip b {
   color: #7d8c80;
@@ -3743,7 +3743,7 @@ textarea {
 .content-metric-strip small {
   align-self: center;
   color: #8b978d;
-  font-size: 10px;
+  font-size: 11px;
 }
 .content-library-empty {
   padding: 38px 14px;
@@ -3779,11 +3779,11 @@ textarea {
   gap: 10px;
   padding: 8px 0;
   color: #809084;
-  font-size: 10px;
+  font-size: 11px;
 }
 .content-settings-head button {
   padding: 3px 7px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 /* Task calendar ------------------------------------------------------------ */
@@ -3806,12 +3806,12 @@ textarea {
 .work-page .task-2l-tools button {
   min-height: 28px;
   padding: 4px 8px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .work-page .task-2l-tools input[type="month"] {
   min-height: 28px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .work-page .task-sync-status {
   color: #5f7a68;
@@ -3841,7 +3841,7 @@ textarea {
 }
 .calendar-weekdays b {
   padding: 5px 2px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .calendar-weekdays b:first-child { color: #c16055; }
 .calendar-weekdays b:last-child { color: #467bb5; }
@@ -3852,7 +3852,7 @@ textarea {
   height: 16px;
 }
 .calendar-day-add b {
-  font-size: 10px;
+  font-size: 11px;
 }
 .calendar-day-add span,
 .calendar-day:hover .calendar-day-add span {
@@ -3865,7 +3865,7 @@ textarea {
 .calendar-week-bars .calendar-task-bar {
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 13px;
 }
 .task-tree .inline-tools {
@@ -3874,11 +3874,11 @@ textarea {
 .task-tree .inline-tools button {
   min-height: 26px;
   padding: 3px 7px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .task-tree .section-toolbar small {
   color: #809084;
-  font-size: 9px;
+  font-size: 11px;
 }
 .task-tree .task-row.task-card {
   min-height: 61px;
@@ -3891,7 +3891,7 @@ textarea {
 }
 .task-tree .task-row.task-card .task-row-main small {
   margin-top: 2px;
-  font-size: 9px;
+  font-size: 11px;
 }
 .task-event-row {
   margin-bottom: 5px;
@@ -4056,7 +4056,7 @@ textarea {
   padding: 0 0 4px;
 }
 .work-page .task-2l h1 {
-  font-size: 18px;
+  font-size: 20px;
 }
 .work-page .task-calendar.panel {
   padding: 0;
@@ -4263,4 +4263,100 @@ textarea {
 .task-event-row.done strong {
   color: var(--muted);
   text-decoration: line-through;
+}
+
+/* Global header tools: save status, the shared period control, logout (2026-09-29). */
+.topbar-tools {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.topbar-tools .logout {
+  margin-left: 2px;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+.topbar-tools .status {
+  overflow: hidden;
+  max-width: 190px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar-tools .status i {
+  flex: 0 0 auto;
+}
+.period-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.period-control > button,
+.period-control input {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.period-control input[type="month"],
+.period-control input[type="date"] {
+  width: 128px;
+}
+.period-control input[type="number"] {
+  width: 76px;
+}
+.period-control .segmented button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+@media (max-width: 1360px) {
+  /* Keep the dot; the full save label stays available as a tooltip. */
+  .topbar-tools .status {
+    max-width: 14px;
+    font-size: 0;
+  }
+}
+@media (max-width: 1100px) {
+  .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 44px;
+    row-gap: 0;
+  }
+  .topbar-tools {
+    width: 100%;
+    justify-content: flex-end;
+    padding-bottom: 6px;
+  }
+}
+
+/* Readability floor (2026-09-29): no text in the app is smaller than 11px.
+   Earlier 8–10px declarations were raised to 11px in place. */
+
+/* Compact page titles, same rhythm as the task and content pages (2026-09-29). */
+.page-title {
+  align-items: center;
+  margin: 2px 0 10px;
+}
+.page-title-text {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+}
+.page-title-text h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.page-title-text p {
+  overflow: hidden;
+  margin: 0;
+  color: #5d8067;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

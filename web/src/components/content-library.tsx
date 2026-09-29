@@ -30,12 +30,10 @@ type Lifecycle = "active" | "archive" | "trash";
 type Props = {
   data: Data;
   month: string;
-  today: string;
   lifecycle: string;
   search: string;
   onLifecycle: (value: string) => void;
   onSearch: (value: string) => void;
-  onMonthChange: (value: string) => void;
   onCreate: () => void;
   onManageChannels: () => void;
   onDetail: (id: string) => void;
@@ -146,12 +144,10 @@ function displayValue(value: number | null, row: MetricRow | undefined) {
 export function ContentLibrary({
   data,
   month,
-  today,
   lifecycle,
   search,
   onLifecycle,
   onSearch,
-  onMonthChange,
   onCreate,
   onManageChannels,
   onDetail,
@@ -187,20 +183,13 @@ export function ContentLibrary({
       else next.add(id);
       return next;
     });
-  const moveMonth = (offset: number) => {
-    const [year, currentMonth] = month.split("-").map(Number);
-    const next = new Date(Date.UTC(year, currentMonth - 1 + offset, 1));
-    onMonthChange(
-      `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`,
-    );
-  };
 
   return (
     <section className="content-library" aria-labelledby="content-library-title">
       <div className="content-library-head">
         <div className="content-library-title">
           <h1 id="content-library-title">콘텐츠</h1>
-          <span className="content-library-sync">● 콘텐츠·광고 소재 운영</span>
+          <span className="content-library-sync">콘텐츠·광고 소재 운영</span>
         </div>
         <div className="content-library-controls">
           <div className="segmented content-lifecycle" aria-label="소재 상태 필터">
@@ -227,17 +216,6 @@ export function ContentLibrary({
               onChange={(event) => onSearch(event.target.value)}
             />
           </label>
-          <div className="content-period-controls">
-            <button aria-label="이전 달" onClick={() => moveMonth(-1)}>‹</button>
-            <input
-              aria-label="콘텐츠 조회 월"
-              type="month"
-              value={month}
-              onChange={(event) => event.target.value && onMonthChange(event.target.value)}
-            />
-            <button aria-label="다음 달" onClick={() => moveMonth(1)}>›</button>
-            <button onClick={() => onMonthChange(today.slice(0, 7))}>오늘</button>
-          </div>
           <button onClick={onManageChannels}>채널 관리</button>
           <button className="primary" onClick={onCreate}>＋ 소재 추가</button>
         </div>

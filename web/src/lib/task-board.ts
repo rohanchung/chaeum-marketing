@@ -1,8 +1,8 @@
-import { Task, localDate } from "./domain";
+import { Data, Task, TaskStatus, timestamp } from "./domain";
+import { dateOnly, dueTimestamp } from "./task-dates";
+import { recurringDatesInRange } from "./task-recurrence";
 
 export type SourceFilter = "all" | "requested" | "recurring";
-
-const dateOnly = (value: string | null) => (value ? localDate(new Date(value)) : null);
 
 /** A task's source is single-valued, so the source filter is a single choice. */
 export function matchesSource(task: Task, filter: SourceFilter) {
@@ -55,4 +55,52 @@ export function todayBoard(tasks: Task[], today: string): TodayBoard {
   board.recurring.sort(compareBoardTasks);
   board.undated.sort(compareBoardTasks);
   return board;
+}
+
+/**
+ * Expands recurring series into dated occurrences (with their completion
+ * state) next to the one-off tasks. Without a range, a series yields its open
+ * occurrences from the earliest unfinished one through today.
+ */
+export function materializedTasks(
+  data: Data,
+  today: string,
+  calendarRange?: { start: string; end: string },
+): Task[] {
+  const occurrences = new Map(
+    data.taskOccurrences.map((occurrence) => [
+      `${occurrence.task_id}:${occurrence.occurrence_on}`,
+      occurrence,
+    ]),
+  );
+  return data.tasks
+    .filter((task) => !task.deleted_at)
+    .flatMap((task): Task[] => {
+      if (task.source_type !== "recurring" || !task.recurrence_frequency) return [task];
+      // Without a calendar range, show the open occurrences from the earliest
+      // unfinished one through today, so missed occurrences stay visible.
+      const nextOn = task.recurrence_next_on;
+      const range = calendarRange ?? (nextOn
+        ? { start: nextOn, end: nextOn > today ? nextOn : today }
+        : null);
+      if (!range) return [];
+      return recurringDatesInRange(task, range.start, range.end).map((occurrenceOn) => {
+        const occurrence = occurrences.get(`${task.id}:${occurrenceOn}`);
+        const status: TaskStatus = occurrence?.status === "done"
+          ? "done"
+          : occurrence?.status === "skipped"
+            ? "cancelled"
+            : "planned";
+        return {
+          ...task,
+          id: `${task.id}:${occurrenceOn}`,
+          recurrence_template_id: task.id,
+          occurrence_on: occurrenceOn,
+          start_at: timestamp(occurrenceOn),
+          due_at: dueTimestamp(occurrenceOn),
+          status,
+          completed_at: occurrence?.completed_at ?? null,
+        } as Task;
+      });
+    });
 }

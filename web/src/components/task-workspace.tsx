@@ -1,23 +1,9 @@
 "use client";
 
-import { DragEvent, FormEvent, WheelEvent, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Data,
-  MarketingEvent,
-  Task,
-  TaskChecklistItem,
-  TaskPriority,
-  TaskSource,
-  TaskStatus,
-  WorkProject,
-  dates,
-  localDate,
-  monthPeriod,
-  timestamp,
-} from "@/lib/domain";
-import { Collection } from "@/lib/repository";
-import { recurringDatesInRange, recurrenceText } from "@/lib/task-recurrence";
-import { SourceFilter, matchesSource, todayBoard } from "@/lib/task-board";
+import { DragEvent, WheelEvent, useMemo, useRef, useState } from "react";
+import { Data, MarketingEvent, Task, TaskChecklistItem, WorkProject, dates, eventStatusLabels, monthPeriod, timestamp } from "@/lib/domain";
+import { SourceFilter, materializedTasks, matchesSource, todayBoard } from "@/lib/task-board";
+import { addDays, dateOnly, dayDistance, dueTimestamp, taskRecordId } from "@/lib/task-dates";
 import {
   CALENDAR_DAY_HEADER,
   CALENDAR_LANE_HEIGHT,
@@ -27,845 +13,22 @@ import {
   weekRowHeight,
   weekSegment,
 } from "@/lib/task-calendar";
-
-type Save = (collection: Collection, record: Record<string, unknown>) => Promise<void>;
-type Update = (
-  collection: Collection,
-  id: string,
-  patch: Record<string, unknown>,
-) => void;
-
-const statusLabels: Record<TaskStatus, string> = {
-  requested: "받은 요청",
-  planned: "예정",
-  in_progress: "진행 중",
-  waiting: "대기",
-  on_hold: "보류",
-  done: "완료",
-  cancelled: "취소",
-};
-const eventStatusLabels: Record<string, string> = {
-  planned: "예정",
-  active: "진행 중",
-  completed: "완료",
-  cancelled: "취소",
-};
-const priorityLabels: Record<TaskPriority, string> = {
-  low: "낮음",
-  normal: "보통",
-  high: "높음",
-};
-const sourceLabels: Record<TaskSource, string> = {
-  self: "내가 만든 업무",
-  requested: "요청받은 업무",
-  recurring: "반복 업무",
-};
-const dateOnly = (value: string | null) =>
-  value ? localDate(new Date(value)) : null;
-const dueTimestamp = (value: string) => `${value}T23:59:00+09:00`;
-const dateLabel = (value: string | null, today: string) => {
-  const date = dateOnly(value);
-  if (!date) return "날짜 미정";
-  if (date < today) return "기한 초과";
-  if (date === today) return "오늘";
-  return date.slice(5).replace("-", "/");
-};
-const compactDate = (value: string | null | undefined) => {
-  const date = dateOnly(value ?? null);
-  return date ? date.slice(5).replace("-", "/") : "—";
-};
-const koreanClock = (value: string) =>
-  new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
-const useModalEscape = (onClose: () => void) => {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-};
-const projectColor = (project: WorkProject | undefined) => project?.color ?? "#4e986e";
-const readableOnColor = (color: string) => {
-  const match = color.match(/^#([0-9a-f]{6})$/i);
-  if (!match) return "#ffffff";
-  const [r, g, b] = [0, 2, 4].map((offset) => Number.parseInt(match[1].slice(offset, offset + 2), 16));
-  return (r * 299 + g * 587 + b * 114) / 1000 > 155 ? "#18352a" : "#ffffff";
-};
-const dayDistance = (from: string, to: string) =>
-  Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000);
-const addDays = (value: string, amount: number) => {
-  const date = new Date(`${value}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + amount);
-  return date.toISOString().slice(0, 10);
-};
-const taskRecordId = (task: Task) => task.recurrence_template_id ?? task.id;
-type CardDropPosition = "before" | "after" | "child";
-type CardDropTarget = { id: string; position: CardDropPosition };
-
-export function materializedTasks(
-  data: Data,
-  today: string,
-  calendarRange?: { start: string; end: string },
-): Task[] {
-  const occurrences = new Map(
-    data.taskOccurrences.map((occurrence) => [
-      `${occurrence.task_id}:${occurrence.occurrence_on}`,
-      occurrence,
-    ]),
-  );
-  return data.tasks
-    .filter((task) => !task.deleted_at)
-    .flatMap((task): Task[] => {
-      if (task.source_type !== "recurring" || !task.recurrence_frequency) return [task];
-      // Without a calendar range, show the open occurrences from the earliest
-      // unfinished one through today, so missed occurrences stay visible.
-      const nextOn = task.recurrence_next_on;
-      const range = calendarRange ?? (nextOn
-        ? { start: nextOn, end: nextOn > today ? nextOn : today }
-        : null);
-      if (!range) return [];
-      return recurringDatesInRange(task, range.start, range.end).map((occurrenceOn) => {
-        const occurrence = occurrences.get(`${task.id}:${occurrenceOn}`);
-        const status: TaskStatus = occurrence?.status === "done"
-          ? "done"
-          : occurrence?.status === "skipped"
-            ? "cancelled"
-            : "planned";
-        return {
-          ...task,
-          id: `${task.id}:${occurrenceOn}`,
-          recurrence_template_id: task.id,
-          occurrence_on: occurrenceOn,
-          start_at: timestamp(occurrenceOn),
-          due_at: dueTimestamp(occurrenceOn),
-          status,
-          completed_at: occurrence?.completed_at ?? null,
-        } as Task;
-      });
-    });
-}
-
-export function TaskForm({
-  data,
-  today,
-  now,
-  task: editingTask,
-  initialProjectId = "",
-  initialDate = "",
-  initialParentTaskId = "",
-  initialTitle = "",
-  onSave,
-  onArchive,
-  onCreateFollowUp,
-  onClose,
-}: {
-  data: Data;
-  today: string;
-  now: string;
-  task: Task | null;
-  initialProjectId?: string;
-  initialDate?: string;
-  initialParentTaskId?: string;
-  initialTitle?: string;
-  onSave: Save;
-  onArchive: (task: Task) => void;
-  onCreateFollowUp: (task: Task, title: string) => void;
-  onClose: () => void;
-}) {
-  useModalEscape(onClose);
-  // An occurrence of a recurring task edits its series record, so the series
-  // keeps its first date instead of moving to the clicked occurrence.
-  const task = editingTask?.recurrence_template_id
-    ? data.tasks.find((item) => item.id === editingTask.recurrence_template_id) ?? editingTask
-    : editingTask;
-  const initialProject = task?.project_id ?? initialProjectId;
-  const [title, setTitle] = useState(task?.title ?? initialTitle);
-  const [projectId, setProjectId] = useState(initialProject);
-  const [sourceType, setSourceType] = useState<TaskSource>(task?.source_type ?? "self");
-  const [requester, setRequester] = useState(task?.requester_name ?? "");
-  const [status, setStatus] = useState<TaskStatus>(task?.status ?? "planned");
-  const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? "normal");
-  const [startOn, setStartOn] = useState(dateOnly(task?.start_at ?? null) ?? initialDate);
-  const [dueOn, setDueOn] = useState(dateOnly(task?.due_at ?? null) ?? initialDate);
-  const [description, setDescription] = useState(task?.description ?? "");
-  const [requestNote, setRequestNote] = useState(task?.request_note ?? "");
-  const [result, setResult] = useState(task?.result ?? "");
-  const [nextAction, setNextAction] = useState(task?.next_action ?? "");
-  const [dependsOnTaskId, setDependsOnTaskId] = useState(task?.depends_on_task_id ?? initialParentTaskId);
-  const [recurrenceFrequency, setRecurrenceFrequency] = useState<Task["recurrence_frequency"]>(
-    task?.recurrence_frequency ?? "daily",
-  );
-  const [recurrenceInterval, setRecurrenceInterval] = useState(
-    String(task?.recurrence_interval ?? 1),
-  );
-  const [recurrenceUntil, setRecurrenceUntil] = useState(task?.recurrence_until ?? "");
-  // Keep a trashed project selectable while this task still points to it;
-  // otherwise saving any other field would silently unlink the project.
-  const projects = data.workProjects.filter(
-    (project) => !project.deleted_at || project.id === task?.project_id,
-  );
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!title.trim()) return;
-    const project = projects.find((item) => item.id === projectId);
-    const recurring = sourceType === "recurring";
-    // New tasks open with today prefilled; clearing both dates keeps the task
-    // undated, and it then appears under "날짜 미정" on the today board.
-    const normalizedStart = recurring ? startOn || today : startOn || dueOn;
-    const normalizedDue = recurring ? dueOn || normalizedStart : dueOn || normalizedStart;
-    // The earliest open occurrence can never precede the series start.
-    const seriesStart = normalizedStart || today;
-    const recurrenceNextOn = recurring
-      ? task?.recurrence_next_on && task.recurrence_next_on >= seriesStart
-        ? task.recurrence_next_on
-        : seriesStart
-      : null;
-    await onSave("tasks", {
-      ...(task ? { id: task.recurrence_template_id ?? task.id } : {}),
-      area_id: project?.area_id ?? data.workAreas.find((area) => !area.deleted_at)?.id ?? null,
-      project_id: projectId || null,
-      title: title.trim(),
-      description: description.trim() || null,
-      result: result.trim() || null,
-      next_action: nextAction.trim() || null,
-      source_type: sourceType,
-      requester_name: sourceType === "requested" ? requester.trim() || null : null,
-      requested_on: sourceType === "requested" ? task?.requested_on ?? today : null,
-      request_note: sourceType === "requested" ? requestNote.trim() || null : null,
-      status,
-      priority,
-      start_at: normalizedStart ? timestamp(normalizedStart) : null,
-      due_at: normalizedDue ? dueTimestamp(normalizedDue) : null,
-      completed_at: status === "done" ? task?.completed_at ?? now : null,
-      depends_on_task_id: dependsOnTaskId || null,
-      sort_order: task?.sort_order ?? Math.max(0, ...data.tasks.filter((item) => !item.deleted_at).map((item) => item.sort_order)) + 100,
-      recurrence_frequency: recurring ? recurrenceFrequency : null,
-      recurrence_interval: recurring ? Math.max(1, Number(recurrenceInterval) || 1) : 1,
-      recurrence_weekday: recurring && normalizedStart ? new Date(`${normalizedStart}T12:00:00Z`).getUTCDay() : null,
-      recurrence_until: recurring ? recurrenceUntil || null : null,
-      recurrence_next_on: recurrenceNextOn,
-      recurrence_active: recurring,
-      deleted_at: null,
-      updated_at: now,
-    });
-    onClose();
-  }
-  return (
-    <div className="modal-backdrop">
-      <form className="editor task-editor" onSubmit={(event) => void submit(event)}>
-        <header>
-          <div>
-            <small>업무</small>
-            <h2>{task ? "업무 수정" : "업무 추가"}</h2>
-          </div>
-          <button type="button" aria-label="업무 편집 닫기" onClick={onClose}>
-            ✕
-          </button>
-        </header>
-        <label className="form-field">
-          <span>제목</span>
-          <input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
-        </label>
-        <div className="form-pair">
-          <label className="form-field">
-            <span>프로젝트</span>
-            <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-              <option value="">미분류 업무</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.deleted_at ? `(휴지통) ${project.name}` : project.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="form-field">
-            <span>업무 출처</span>
-            <select value={sourceType} onChange={(event) => setSourceType(event.target.value as TaskSource)}>
-              {Object.entries(sourceLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label className="form-field">
-          <span>상위 업무 (선택)</span>
-          <select value={dependsOnTaskId} onChange={(event) => setDependsOnTaskId(event.target.value)}>
-            <option value="">없음</option>
-            {data.tasks
-              .filter((item) => !item.deleted_at && item.id !== (task?.recurrence_template_id ?? task?.id))
-              .sort((a, b) => a.title.localeCompare(b.title, "ko"))
-              .map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.title}
-                  {item.project_id ? ` · ${data.workProjects.find((project) => project.id === item.project_id)?.name ?? ""}` : ""}
-                </option>
-              ))}
-          </select>
-        </label>
-        {sourceType === "recurring" && (
-          <div className="recurrence-box">
-            <div className="recurrence-heading">
-              <strong>반복 규칙</strong>
-              <small>{recurrenceFrequency ? recurrenceText({ ...task, recurrence_frequency: recurrenceFrequency, recurrence_interval: Math.max(1, Number(recurrenceInterval) || 1) } as Task) : ""}</small>
-            </div>
-            <div className="form-pair">
-              <label className="form-field">
-                <span>반복 주기</span>
-                <select value={recurrenceFrequency ?? "daily"} onChange={(event) => setRecurrenceFrequency(event.target.value as Task["recurrence_frequency"])}>
-                  <option value="daily">매일</option>
-                  <option value="weekly">매주</option>
-                  <option value="monthly">매월</option>
-                </select>
-              </label>
-              <label className="form-field">
-                <span>간격</span>
-                <input type="number" min={1} value={recurrenceInterval} onChange={(event) => setRecurrenceInterval(event.target.value)} />
-              </label>
-            </div>
-            <label className="form-field">
-              <span>반복 종료일 (선택)</span>
-              <input type="date" value={recurrenceUntil} onChange={(event) => setRecurrenceUntil(event.target.value)} />
-            </label>
-          </div>
-        )}
-        {sourceType === "requested" && (
-          <div className="form-pair">
-            <label className="form-field">
-              <span>요청자</span>
-              <input value={requester} onChange={(event) => setRequester(event.target.value)} required />
-            </label>
-            <label className="form-field">
-              <span>요청일</span>
-              <input type="date" value={task?.requested_on ?? today} readOnly />
-            </label>
-          </div>
-        )}
-        <div className="form-pair">
-          <label className="form-field">
-            <span>실행 예정일</span>
-            <input type="date" value={startOn} onChange={(event) => setStartOn(event.target.value)} />
-          </label>
-          <label className="form-field">
-            <span>마감일 · 둘 다 비우면 날짜 미정</span>
-            <input type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} />
-          </label>
-        </div>
-        <div className="form-pair">
-          <label className="form-field">
-            <span>상태</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus)}>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="form-field">
-            <span>우선순위</span>
-            <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>
-              {Object.entries(priorityLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {sourceType === "requested" && (
-          <label className="form-field">
-            <span>요청 내용</span>
-            <textarea rows={2} value={requestNote} onChange={(event) => setRequestNote(event.target.value)} />
-          </label>
-        )}
-        <label className="form-field">
-          <span>메모</span>
-          <textarea rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
-        </label>
-        <label className="form-field">
-          <span>처리 결과</span>
-          <textarea rows={2} value={result} onChange={(event) => setResult(event.target.value)} />
-        </label>
-        <section className="next-task-composer">
-          <div>
-            <strong>다음 업무</strong>
-            <small>입력한 내용을 현재 업무의 하위 업무로 바로 만듭니다.</small>
-          </div>
-          <div className="next-task-composer-input">
-            <input value={nextAction} onChange={(event) => setNextAction(event.target.value)} placeholder="다음에 할 업무 입력" />
-            {task && (
-              <button
-                type="button"
-                disabled={!nextAction.trim()}
-                onClick={() => onCreateFollowUp(task, nextAction.trim())}
-              >
-                ＋ 하위 업무
-              </button>
-            )}
-          </div>
-          {!task && <small>업무를 먼저 저장하면 하위 업무를 바로 만들 수 있습니다.</small>}
-        </section>
-        <footer>
-          {task && (
-            <button
-              type="button"
-              className="danger-text"
-              onClick={() => {
-                if (window.confirm("이 업무를 휴지통으로 이동할까요?")) {
-                  onArchive({ ...task, id: task.recurrence_template_id ?? task.id });
-                  onClose();
-                }
-              }}
-            >
-              휴지통
-            </button>
-          )}
-          <button type="button" onClick={onClose}>
-            취소
-          </button>
-          <button className="primary" type="submit">
-            저장
-          </button>
-        </footer>
-      </form>
-    </div>
-  );
-}
-
-function ProjectForm({
-  data,
-  project,
-  onSave,
-  onArchive,
-  onClose,
-}: {
-  data: Data;
-  project: WorkProject | null;
-  onSave: Save;
-  onArchive: (project: WorkProject) => void;
-  onClose: () => void;
-}) {
-  useModalEscape(onClose);
-  const [name, setName] = useState(project?.name ?? "");
-  const [areaId, setAreaId] = useState(project?.area_id ?? data.workAreas.find((area) => !area.deleted_at)?.id ?? "");
-  const [status, setStatus] = useState(project?.status ?? "active");
-  const [priority, setPriority] = useState(project?.priority ?? "normal");
-  const [startOn, setStartOn] = useState(project?.start_on ?? "");
-  const [dueOn, setDueOn] = useState(project?.due_on ?? "");
-  const [color, setColor] = useState(project?.color ?? "#4e986e");
-  const [description, setDescription] = useState(project?.description ?? "");
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!name.trim() || !areaId) return;
-    await onSave("workProjects", {
-      ...(project ? { id: project.id } : {}),
-      area_id: areaId,
-      name: name.trim(),
-      description: description.trim() || null,
-      color,
-      status,
-      priority,
-      start_on: startOn || null,
-      due_on: dueOn || null,
-      deleted_at: null,
-    });
-    onClose();
-  }
-  return (
-    <div className="modal-backdrop">
-      <form className="editor task-editor" onSubmit={(event) => void submit(event)}>
-        <header>
-          <div>
-            <small>프로젝트</small>
-            <h2>{project ? "프로젝트 수정" : "프로젝트 추가"}</h2>
-          </div>
-          <button type="button" aria-label="프로젝트 편집 닫기" onClick={onClose}>
-            ✕
-          </button>
-        </header>
-        <label className="form-field">
-          <span>프로젝트명</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} autoFocus required />
-        </label>
-        <label className="form-field">
-          <span>업무 영역</span>
-          <select value={areaId} onChange={(event) => setAreaId(event.target.value)} required>
-            {data.workAreas.filter((area) => !area.deleted_at).map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="form-pair">
-          <label className="form-field">
-            <span>시작일</span>
-            <input type="date" value={startOn} onChange={(event) => setStartOn(event.target.value)} />
-          </label>
-          <label className="form-field">
-            <span>목표일</span>
-            <input type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} />
-          </label>
-        </div>
-        <div className="form-pair">
-          <label className="form-field">
-            <span>상태</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value as WorkProject["status"]) }>
-              <option value="active">진행 중</option>
-              <option value="paused">보류</option>
-              <option value="completed">완료</option>
-            </select>
-          </label>
-          <label className="form-field">
-            <span>우선순위</span>
-            <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>
-              {Object.entries(priorityLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label className="form-field color-field">
-          <span>캘린더 색상</span>
-          <div className="color-input-row">
-            <input type="color" value={color} onChange={(event) => setColor(event.target.value)} aria-label="프로젝트 캘린더 색상" />
-            <code>{color.toUpperCase()}</code>
-            <small>이 프로젝트에 연결된 업무 바에 적용됩니다.</small>
-          </div>
-        </label>
-        <label className="form-field">
-          <span>설명</span>
-          <textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} />
-        </label>
-        <footer>
-          {project && (
-            <button
-              type="button"
-              className="danger-text"
-              onClick={() => {
-                if (window.confirm("이 프로젝트를 휴지통으로 이동할까요? 연결된 업무 기록은 보존됩니다.")) {
-                  onArchive(project);
-                  onClose();
-                }
-              }}
-            >
-              휴지통
-            </button>
-          )}
-          <button type="button" onClick={onClose}>
-            취소
-          </button>
-          <button className="primary" type="submit">
-            저장
-          </button>
-        </footer>
-      </form>
-    </div>
-  );
-}
-
-function TaskRow({
-  task,
-  data,
-  today,
-  serverNow,
-  depth,
-  reorderable,
-  dragging,
-  dropPosition,
-  onToggle,
-  onEdit,
-  onResult,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
-  checklistItems,
-  checklistOpen,
-  onChecklistOpen,
-  onChecklistAdd,
-  onChecklistUpdate,
-  onChecklistDelete,
-}: {
-  task: Task;
-  data: Data;
-  today: string;
-  serverNow: string;
-  depth: number;
-  reorderable: boolean;
-  dragging: boolean;
-  dropPosition: CardDropPosition | null;
-  onToggle: (task: Task) => void;
-  onEdit: (task: Task) => void;
-  onResult: (task: Task, result: string) => void;
-  onDragStart: (event: DragEvent<HTMLElement>, task: Task) => void;
-  onDragOver: (event: DragEvent<HTMLElement>, task: Task) => void;
-  onDragLeave: () => void;
-  onDrop: (event: DragEvent<HTMLElement>, task: Task) => void;
-  onDragEnd: () => void;
-  checklistItems: TaskChecklistItem[];
-  checklistOpen: boolean;
-  onChecklistOpen: (task: Task) => void;
-  onChecklistAdd: (task: Task, title: string) => void;
-  onChecklistUpdate: (item: TaskChecklistItem, patch: Record<string, unknown>) => void;
-  onChecklistDelete: (item: TaskChecklistItem) => void;
-}) {
-  const [checklistDraft, setChecklistDraft] = useState("");
-  const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
-  const [editingChecklistTitle, setEditingChecklistTitle] = useState("");
-  // FR-016: after completing a task without a result, offer a one-line result
-  // input on the card. Completion never waits for it.
-  const [resultPrompt, setResultPrompt] = useState(false);
-  const [resultDraft, setResultDraft] = useState("");
-  const startOn = dateOnly(task.start_at);
-  const dueOn = dateOnly(task.due_at);
-  const project = data.workProjects.find((item) => item.id === task.project_id);
-  const parentTask = data.tasks.find((item) => item.id === task.depends_on_task_id && !item.deleted_at);
-  const due = dateOnly(task.due_at);
-  const overdue = due !== null && due < today && task.status !== "done";
-  const completedChecklistCount = checklistItems.filter((item) => item.completed_at).length;
-  const stopCardAction = (event: { stopPropagation: () => void }) => event.stopPropagation();
-  const addChecklistItem = () => {
-    const title = checklistDraft.trim();
-    if (!title) return;
-    onChecklistAdd(task, title);
-    setChecklistDraft("");
-  };
-  return (
-    <article
-      className={`task-row task-card${overdue ? " overdue" : ""}${task.status === "done" ? " done" : ""}${dragging ? " dragging" : ""}${dropPosition ? ` drop-${dropPosition}` : ""}`}
-      style={{ marginLeft: `${Math.min(depth, 3) * 14}px` }}
-      draggable={reorderable}
-      role="button"
-      tabIndex={0}
-      onClick={() => onEdit(task)}
-      onKeyDown={(event) => {
-        // Keys typed into the card inputs (checklist, result) must not open the editor.
-        if (event.target !== event.currentTarget) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onEdit(task);
-        }
-      }}
-      onDragStart={(event) => {
-        if ((event.target as HTMLElement).closest("button, input, form")) {
-          event.preventDefault();
-          return;
-        }
-        onDragStart(event, task);
-      }}
-      onDragOver={(event) => onDragOver(event, task)}
-      onDragLeave={onDragLeave}
-      onDrop={(event) => onDrop(event, task)}
-      onDragEnd={onDragEnd}
-    >
-      <span className="task-card-handle" aria-hidden="true">⠿</span>
-      <input
-        type="checkbox"
-        checked={task.status === "done"}
-        aria-label={`${task.title} 완료`}
-        onClick={(event) => event.stopPropagation()}
-        onChange={(event) => {
-          event.stopPropagation();
-          const completing = task.status !== "done";
-          onToggle(task);
-          setResultPrompt(completing && !task.recurrence_template_id && !task.result);
-        }}
-      />
-      <div className="task-row-main">
-        <strong>{task.title}</strong>
-        {task.source_type !== "self" && (
-          <small>
-            {sourceLabels[task.source_type]}
-            {task.recurrence_frequency ? ` · ${recurrenceText(task)}` : ""}
-            {task.requester_name ? ` · ${task.requester_name}` : ""}
-          </small>
-        )}
-        {project && (
-          <small className="task-project-label">
-            프로젝트 · {project.name}{project.deleted_at ? " (휴지통)" : ""}
-          </small>
-        )}
-        {(startOn || dueOn) && (
-          <div className="task-row-dates">
-            {startOn && dueOn && startOn !== dueOn ? (
-              <>
-                <span>실행 {compactDate(task.start_at)}</span>
-                <span>마감 {compactDate(task.due_at)}</span>
-              </>
-            ) : (
-              <span>{compactDate(task.due_at ?? task.start_at)}</span>
-            )}
-          </div>
-        )}
-        {task.result && <small className="task-result-label">결과 · {task.result}</small>}
-        {parentTask && (
-          <small className="task-dependency">
-            상위 업무 · {parentTask.title}
-          </small>
-        )}
-      </div>
-      <button
-        type="button"
-        className="task-checklist-toggle"
-        aria-label={`${task.title} 세부 체크 ${checklistOpen ? "접기" : "열기"}`}
-        aria-expanded={checklistOpen}
-        onClick={(event) => {
-          stopCardAction(event);
-          onChecklistOpen(task);
-        }}
-      >
-        ＋
-        {checklistItems.length > 0 && <small>{completedChecklistCount}/{checklistItems.length}</small>}
-      </button>
-      <span className="task-status">{statusLabels[task.status]}</span>
-      <span className={`task-due${overdue ? " task-overdue" : ""}`}>
-        {dateLabel(task.due_at ?? task.start_at, today)}
-      </span>
-      {resultPrompt && task.status === "done" && (
-        <form
-          className="task-result-prompt"
-          onClick={stopCardAction}
-          onSubmit={(event) => {
-            event.preventDefault();
-            const value = resultDraft.trim();
-            if (value) onResult(task, value);
-            setResultPrompt(false);
-          }}
-        >
-          <input
-            autoFocus
-            value={resultDraft}
-            aria-label={`${task.title} 처리 결과`}
-            placeholder="처리 결과 남기기 (선택)"
-            onChange={(event) => setResultDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setResultPrompt(false);
-              }
-            }}
-          />
-          <button type="submit" disabled={!resultDraft.trim()}>저장</button>
-          <button type="button" onClick={() => setResultPrompt(false)}>건너뛰기</button>
-        </form>
-      )}
-      {checklistOpen && (
-        <div
-          className="task-checklist"
-          onClick={stopCardAction}
-          onDragStart={(event) => event.preventDefault()}
-        >
-          {checklistItems.length > 0 && (
-            <div className="task-checklist-items">
-              {checklistItems.map((item) => {
-                const editing = editingChecklistId === item.id;
-                return (
-                  <div className={`task-checklist-item${item.completed_at ? " done" : ""}`} key={item.id}>
-                    <input
-                      type="checkbox"
-                      checked={!!item.completed_at}
-                      aria-label={`${item.title} 완료`}
-                      onChange={() => onChecklistUpdate(item, { completed_at: item.completed_at ? null : serverNow })}
-                    />
-                    {editing ? (
-                      <form
-                        className="task-checklist-edit"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          const title = editingChecklistTitle.trim();
-                          if (title) onChecklistUpdate(item, { title });
-                          setEditingChecklistId(null);
-                        }}
-                      >
-                        <input
-                          autoFocus
-                          value={editingChecklistTitle}
-                          aria-label="세부 체크 항목 수정"
-                          onChange={(event) => setEditingChecklistTitle(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              setEditingChecklistId(null);
-                            }
-                          }}
-                        />
-                      </form>
-                    ) : <span>{item.title}</span>}
-                    <button
-                      type="button"
-                      className="task-checklist-edit-button"
-                      aria-label={`${item.title} 수정`}
-                      onClick={() => {
-                        setEditingChecklistId(item.id);
-                        setEditingChecklistTitle(item.title);
-                      }}
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      className="task-checklist-delete"
-                      aria-label={`${item.title} 삭제`}
-                      onClick={() => {
-                        if (window.confirm(`“${item.title}” 체크 항목을 삭제할까요?`)) onChecklistDelete(item);
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <form
-            className="task-checklist-create"
-            onSubmit={(event) => {
-              event.preventDefault();
-              addChecklistItem();
-            }}
-          >
-            <input
-              value={checklistDraft}
-              aria-label={`${task.title} 세부 체크 항목`}
-              placeholder="세부 체크 항목 입력"
-              onChange={(event) => setChecklistDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setChecklistDraft("");
-                }
-              }}
-            />
-            <button type="submit" disabled={!checklistDraft.trim()}>추가</button>
-          </form>
-        </div>
-      )}
-    </article>
-  );
-}
+import { ProjectForm, TaskForm } from "./task-form";
+import { TaskRow } from "./task-row";
+import {
+  CardDropPosition,
+  CardDropTarget,
+  Save,
+  Update,
+  projectColor,
+  readableOnColor,
+} from "./task-shared";
 
 export function TaskWorkspace({
   data,
   events,
   today,
   serverNow,
-  syncLabel,
   month,
   onMonthChange,
   onSave,
@@ -878,7 +41,6 @@ export function TaskWorkspace({
   events: MarketingEvent[];
   today: string;
   serverNow: string;
-  syncLabel: string;
   month: string;
   onMonthChange: (month: string) => void;
   onSave: Save;
@@ -948,22 +110,26 @@ export function TaskWorkspace({
     setPanelMode("today");
   };
   const openTaskForDate = (day: string) => {
-    selectCalendarDate(day);
     setNewTaskProjectId("");
     setNewTaskDate(day);
     setNewTaskParentId("");
     setNewTaskTitle("");
     setTaskEditor(null);
   };
-  const setCalendarMonth = (nextMonth: string) => {
-    onMonthChange(nextMonth);
-    setSelectedDate(nextMonth === today.slice(0, 7) ? today : `${nextMonth}-01`);
-  };
+  // The month lives in the global header. When it changes, keep the selected
+  // date inside the shown month (today for the current month).
+  const [shownMonth, setShownMonth] = useState(month);
+  if (shownMonth !== month) {
+    setShownMonth(month);
+    setSelectedDate(month === today.slice(0, 7) ? today : `${month}-01`);
+  }
+  // Page actions add to the date the side panel is showing.
+  const contextDate = panelMode === "date" ? selectedDate : today;
   const moveCalendarMonth = (offset: number) => {
     const [year, currentMonth] = month.split("-").map(Number);
     const next = new Date(Date.UTC(year, currentMonth - 1 + offset, 1));
     const nextMonth = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
-    setCalendarMonth(nextMonth);
+    onMonthChange(nextMonth);
   };
   // Shift + wheel changes the month. Browsers may report Shift + wheel as a
   // horizontal delta, so either axis counts.
@@ -1270,16 +436,11 @@ export function TaskWorkspace({
               프로젝트
             </button>
           </div>
-          <span className="task-sync-status" role="status">{syncLabel}</span>
         </div>
         <div className="task-2l-tools">
-          <button aria-label="이전 달" onClick={() => moveCalendarMonth(-1)}>‹</button>
-          <input aria-label="업무 캘린더 월" type="month" value={month} onChange={(event) => event.target.value && setCalendarMonth(event.target.value)} />
-          <button aria-label="다음 달" onClick={() => moveCalendarMonth(1)}>›</button>
-          <button onClick={() => { setCalendarMonth(today.slice(0, 7)); showTodayBoard(); }}>오늘</button>
-          <span className="task-clock">한국 {koreanClock(serverNow)}</span>
           <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
-          <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(today); setNewTaskParentId(""); setNewTaskTitle(""); setTaskEditor(null); }}>＋ 업무</button>
+          <button onClick={() => onEditEvent(null, contextDate)} title={`${contextDate.slice(5).replace("-", "/")} 이벤트 추가`}>＋ 이벤트</button>
+          <button className="primary" onClick={() => openTaskForDate(contextDate)} title={`${contextDate.slice(5).replace("-", "/")} 업무 추가`}>＋ 업무</button>
         </div>
       </div>
       <div className="work-layout">
@@ -1293,7 +454,7 @@ export function TaskWorkspace({
                   <div className="calendar-week" key={`week-${weekIndex}`} style={{ flex: `1 0 ${rowHeight}px`, minHeight: `${rowHeight}px` }}>
                     <div className="calendar-days">
                       {week.map((day, index) => <div className={`${day ? "calendar-day" : "calendar-day calendar-day-outside"}${day === today ? " today" : ""}${day === selectedDate ? " selected" : ""}${day && dragOverDate === day ? " drag-over" : ""}`} key={day ?? `outside-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)} onDragOver={(event) => { if (day && draggedTaskId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDragOverDate(day); } }} onDragLeave={() => day && dragOverDate === day && setDragOverDate(null)} onDrop={(event) => { if (!day) return; event.preventDefault(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; if (taskId) moveTaskToDate(taskId, day); }}>
-                        {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>
+                        {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); selectCalendarDate(day); openTaskForDate(day); }}>
                           <b>{Number(day.slice(-2))}</b><span>＋</span>
                         </button>}
                       </div>)}
@@ -1342,10 +503,6 @@ export function TaskWorkspace({
                     <h2>오늘 보드 · {today.slice(5).replace("-", "/")}</h2>
                     <small>기한 초과 {board.overdue.length} · 오늘 {board.today.length} · 반복 {board.recurring.length} · 날짜 미정 {board.undated.length}</small>
                   </div>
-                  <div className="inline-tools">
-                    <button onClick={() => openTaskForDate(today)}>＋ 업무</button>
-                    <button onClick={() => onEditEvent(null, today)}>＋ 이벤트</button>
-                  </div>
                 </div>
               ) : (
                 <div className="section-toolbar">
@@ -1353,10 +510,6 @@ export function TaskWorkspace({
                     <button className="task-board-back" onClick={showTodayBoard}>← 오늘 보드</button>
                     <h2>{selectedDate.slice(5).replace("-", "/")} 업무 목록</h2>
                     <small>업무 {dailyTasks.length}건 · 이벤트 {dailyEvents.length}건 · 카드 오른쪽에 놓으면 하위 업무</small>
-                  </div>
-                  <div className="inline-tools">
-                    <button onClick={() => openTaskForDate(selectedDate)}>＋ 업무</button>
-                    <button onClick={() => onEditEvent(null, selectedDate)}>＋ 이벤트</button>
                   </div>
                 </div>
               )}

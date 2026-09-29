@@ -3,7 +3,6 @@ import { rankText } from "@/lib/keyword-ranks";
 
 import {
   FormEvent,
-  ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -27,10 +26,10 @@ import {
   money,
   monthPeriod,
   number,
-  percent,
   scopeLabels,
   timestamp,
   isBusinessProfile,
+  eventStatusLabels,
 } from "@/lib/domain";
 import { report, sourceName } from "@/lib/analytics";
 import {
@@ -61,6 +60,10 @@ import {
   TaskWorkspace,
 } from "@/components/task-workspace";
 import { ContentLibrary } from "@/components/content-library";
+import { BrandMark, DataTable, Empty, PageTitle } from "@/components/ui";
+import { AppHeader, PeriodRange } from "@/components/app-header";
+import { Kpis } from "@/components/kpis";
+import { Analysis } from "@/components/analysis";
 import { firstOpenOccurrence } from "@/lib/task-recurrence";
 
 const tabs = ["대시보드", "업무", "콘텐츠", "이벤트", "구매", "분석", "리포트", "로그"];
@@ -70,7 +73,6 @@ const koreanClock = (value: string) =>
     timeZone: "Asia/Seoul",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
     hour12: false,
   }).format(new Date(value));
 export default function Home() {
@@ -82,7 +84,7 @@ export default function Home() {
   const [nav, setNav] = useNavigation();
   const [month, setMonth] = useState(() => localDate().slice(0, 7));
   const [day, setDay] = useState(localDate);
-  const [range, setRange] = useState("month");
+  const [range, setRange] = useState<PeriodRange>("month");
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const [eventDate, setEventDate] = useState<string | null>(null);
@@ -448,11 +450,6 @@ export default function Home() {
       : lifecycle === "archive"
         ? !r.deleted_at && r.status === "archived"
         : !r.deleted_at && r.status !== "archived";
-  const moveMonth = (offset: number) => {
-    const [y, m] = month.split("-").map(Number);
-    const d = new Date(y, m - 1 + offset, 1);
-    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-  };
   async function login(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -516,148 +513,52 @@ export default function Home() {
     );
   return (
     <main className="app">
-      <header className="topbar">
-        <button className="brand" onClick={() => setNav("대시보드")}>
-          <BrandMark />
-          <span>
-            로한 <b>마케팅</b>
-          </span>
-        </button>
-        <nav aria-label="주 메뉴">
-          {tabs.map((t) => (
-            <button
-              key={t}
-              className={nav === t ? "active" : ""}
-              onClick={() => {
-                setNav(t);
-                setSelectedReport(null);
-                setLifecycle("active");
-              }}
-            >
-              {t}
-            </button>
-          ))}
-        </nav>
-        <button
-          className="logout"
-          disabled={!!busy}
-          onClick={() =>
-            fire(async () => {
-              await queue.current.catch(() => {});
-              const { error } = await supabase.auth.signOut();
-              if (error) throw error;
-            })
-          }
-        >
-          로그아웃 ↗
-        </button>
-      </header>
+      <AppHeader
+        tabs={tabs}
+        nav={nav}
+        onNav={(tab) => {
+          setNav(tab);
+          setSelectedReport(null);
+          setLifecycle("active");
+        }}
+        saveState={error ? "error" : busy ? "pending" : "ok"}
+        saveLabel={
+          busy
+            ? "저장·조회 중…"
+            : error
+              ? "확인 필요"
+              : ready
+                ? `마지막 저장 ${datePart(lastSavedAt ?? serverNow).slice(5).replace("-", "/")} ${koreanClock(lastSavedAt ?? serverNow)}`
+                : "데이터 확인 필요"
+        }
+        periodMode={
+          nav === "로그" || nav === "구매"
+            ? "none"
+            : nav === "대시보드" || nav === "업무" || nav === "콘텐츠"
+              ? "month"
+              : "range"
+        }
+        range={range}
+        onRange={setRange}
+        month={month}
+        onMonth={setMonth}
+        day={day}
+        onDay={setDay}
+        today={today}
+        onToday={() => {
+          setMonth(today.slice(0, 7));
+          setDay(today);
+        }}
+        busy={!!busy}
+        onLogout={() =>
+          fire(async () => {
+            await queue.current.catch(() => {});
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+          })
+        }
+      />
       <div className={`workspace${nav === "대시보드" ? " dashboard-page" : nav === "콘텐츠" ? " content-page" : nav === "업무" ? " task-page" : ""}`}>
-        {nav !== "업무" && nav !== "콘텐츠" && <div className={`toolbar${nav === "대시보드" ? " dashboard-toolbar" : ""}`}>
-          <div className="status" role="status">
-              <i className={error ? "error" : busy ? "pending" : ""} />
-              {busy
-                ? "저장·조회 중…"
-                : error
-                  ? "확인 필요"
-                  : ready
-                    ? `마지막 저장 ${datePart(lastSavedAt ?? serverNow).slice(5).replace("-", "/")} ${koreanClock(lastSavedAt ?? serverNow)}`
-                    : "데이터 확인 필요"}
-          </div>
-          {nav !== "로그" && (
-            <div className="toolbar-controls">
-              {nav !== "대시보드" && (
-                <div className="segmented">
-                  {[
-                    ["day", "일"],
-                    ["month", "월"],
-                    ["year", "연"],
-                  ].map(([v, l]) => (
-                    <button
-                      key={v}
-                      className={range === v ? "selected" : ""}
-                      onClick={() => setRange(v)}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {nav === "대시보드" || range === "month" ? (
-                <>
-                  <button aria-label="이전 달" onClick={() => moveMonth(-1)}>
-                    ‹
-                  </button>
-                  <input
-                    aria-label="조회 월"
-                    type="month"
-                    value={month}
-                    onChange={(e) => {
-                      if (e.target.value) setMonth(e.target.value);
-                    }}
-                  />
-                  <button aria-label="다음 달" onClick={() => moveMonth(1)}>
-                    ›
-                  </button>
-                </>
-              ) : range === "year" ? (
-                <input
-                  aria-label="조회 연도"
-                  type="number"
-                  min="2000"
-                  max="2200"
-                  value={month.slice(0, 4)}
-                  onChange={(e) => {
-                    if (e.target.value.length === 4)
-                      setMonth(`${e.target.value}-01`);
-                  }}
-                />
-              ) : (
-                <input
-                  aria-label="조회 날짜"
-                  type="date"
-                  value={day}
-                  onChange={(e) => {
-                    if (e.target.value) setDay(e.target.value);
-                  }}
-                />
-              )}
-              <button
-                onClick={() => {
-                  setMonth(today.slice(0, 7));
-                  setDay(today);
-                }}
-              >
-                오늘 {today.slice(5).replace("-", "/")}
-              </button>
-              {nav === "대시보드" && (
-                <details className="quick-menu">
-                  <summary className="primary">＋ 입력</summary>
-                  <div>
-                    {[
-                      ["contents", "소재 추가"],
-                      ["costs", "비용 기록"],
-                      ["customers", "고객·전환 기록"],
-                      ["payments", "결제·환불 기록"],
-                      ["events", "이벤트 기록"],
-                      ["channels", "채널 추가"],
-                    ].map(([c, l]) => (
-                      <button
-                        key={c}
-                        onClick={(e) => {
-                          e.currentTarget.closest("details")!.open = false;
-                          edit({ collection: c as Collection });
-                        }}
-                      >
-                        {l}
-                      </button>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-        </div>}
         {error && (
           <div className="error-box" role="alert">
             <strong>작업을 확인해 주세요.</strong> {error}{" "}
@@ -755,6 +656,28 @@ export default function Home() {
                       >
                         매출 기록
                       </button>
+                      <details className="quick-menu">
+                        <summary className="primary">＋ 입력</summary>
+                        <div>
+                          {[
+                            ["contents", "소재 추가"],
+                            ["costs", "비용 기록"],
+                            ["customers", "고객·전환 기록"],
+                            ["payments", "결제·환불 기록"],
+                            ["events", "이벤트 기록"],
+                          ].map(([c, l]) => (
+                            <button
+                              key={c}
+                              onClick={(e) => {
+                                e.currentTarget.closest("details")!.open = false;
+                                edit({ collection: c as Collection });
+                              }}
+                            >
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                      </details>
                     </div>
                   }
                 />
@@ -766,7 +689,6 @@ export default function Home() {
                 events={data.events}
                 today={today}
                 serverNow={serverNow}
-                syncLabel={busy ? "저장·조회 중…" : error ? "확인 필요" : ready ? `마지막 저장 ${datePart(lastSavedAt ?? serverNow).slice(5).replace("-", "/")} ${koreanClock(lastSavedAt ?? serverNow)}` : "데이터 확인 필요"}
                 month={month}
                 onMonthChange={setMonth}
                 onSave={(collection, record) => mutate(collection, record)}
@@ -782,18 +704,20 @@ export default function Home() {
                 <ContentLibrary
                   data={data}
                   month={month}
-                  today={today}
                   lifecycle={lifecycle}
                   search={search}
                   onLifecycle={setLifecycle}
                   onSearch={setSearch}
-                  onMonthChange={setMonth}
                   onCreate={() => edit({ collection: "contents" })}
-                  onManageChannels={() => edit({ collection: "channels" })}
+                  onManageChannels={() => {
+                    const panel = document.getElementById("content-settings");
+                    if (panel instanceof HTMLDetailsElement) panel.open = true;
+                    panel?.scrollIntoView({ block: "start" });
+                  }}
                   onDetail={setDetail}
                 />
                 <section className="content-settings-panel">
-                  <details>
+                  <details id="content-settings">
                     <summary>채널·지표 관리</summary>
                     <div className="content-settings-head">
                       <span>채널·지표의 측정 방식과 표시 순서를 수정합니다.</span>
@@ -838,8 +762,7 @@ export default function Home() {
             {nav === "구매" && (
               <>
                 <PageTitle
-                  eyebrow="PURCHASES"
-                  title="구매 목록"
+                  title="구매"
                   detail="전체 구매 건 · 결제액은 구매일의 마케팅 비용에 반영됩니다."
                   action={
                     <button
@@ -926,8 +849,7 @@ export default function Home() {
             {nav === "이벤트" && (
               <>
                 <PageTitle
-                  eyebrow="MARKETING EVENTS"
-                  title="변화를 만든 날의 기록"
+                  title="이벤트"
                   detail={`${period.start} ~ ${period.end} · 설명회, 협업, 방송과 오프라인 활동`}
                   action={
                     <button
@@ -966,7 +888,7 @@ export default function Home() {
                         <div>
                           <h2>{e.title}</h2>
                           <p>
-                            {e.location || "장소 미입력"} · {e.status}
+                            {e.location || "장소 미입력"} · {eventStatusLabels[e.status] ?? e.status}
                           </p>
                           <p>{e.notes || "결과 메모를 남겨보세요."}</p>
                           <small>
@@ -996,8 +918,7 @@ export default function Home() {
             {nav === "분석" && (
               <>
                 <PageTitle
-                  eyebrow="MARKETING INTELLIGENCE"
-                  title="기록에서 다음 결정을 찾습니다"
+                  title="분석"
                   detail={`${period.start} ~ ${period.end} · 실제 지급·수납 기준`}
                 />
                 <div className="section-toolbar">
@@ -1221,8 +1142,7 @@ export default function Home() {
             {nav === "리포트" && (
               <>
                 <PageTitle
-                  eyebrow="REPORTS & RECORDS"
-                  title="같은 숫자, 설명 가능한 보고"
+                  title="리포트"
                   detail="분석 화면과 같은 계산 기준을 사용합니다. 보고 시점을 저장하면 이후 수정과 구분해 보관합니다."
                 />
                 <div className="section-toolbar">
@@ -1603,310 +1523,5 @@ export default function Home() {
         />
       )}
     </main>
-  );
-}
-
-function BrandMark() {
-  return (
-    <span className="brand-mark" aria-hidden="true">
-      <svg width="24" height="24" viewBox="0 0 64 64">
-        <path
-          d="M15 46V19l17 18 17-18v27"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  );
-}
-function Empty({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="empty">
-      <span>＋</span>
-      <h3>{title}</h3>
-      <p>{detail}</p>
-    </div>
-  );
-}
-function PageTitle({
-  eyebrow,
-  title,
-  detail,
-  action,
-}: {
-  eyebrow: string;
-  title: string;
-  detail: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="page-title">
-      <div>
-        <small>{eyebrow}</small>
-        <h1>{title}</h1>
-        <p>{detail}</p>
-      </div>
-      {action}
-    </div>
-  );
-}
-function DataTable({
-  headers,
-  rows,
-}: {
-  headers: string[];
-  rows: ReactNode[][];
-}) {
-  return (
-    <div className="data-table-wrap">
-      <table className="data-table">
-        <thead>
-          <tr>
-            {headers.map((h) => (
-              <th key={h}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length ? (
-            rows.map((row, i) => (
-              <tr key={i}>
-                {row.map((cell, j) => (
-                  <td key={j}>{cell}</td>
-                ))}
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={headers.length}>
-                <div className="empty-small">
-                  이 기간에 표시할 기록이 없습니다.
-                </div>
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-function Kpis({
-  report: r,
-  compact = false,
-}: {
-  report: Report;
-  compact?: boolean;
-}) {
-  const s = r.summary;
-  const cards = compact
-    ? [
-        ["학원 유입", number(s.inflows), "전체 일일 집계"],
-        ["상담 건수", number(s.consultations), "상담으로 분류한 학원 지표"],
-        ["신규 등록", number(s.enrollments), "학원 전체"],
-        ["마케팅 비용", money(s.spend), "지급 완료 기준"],
-        ["순수납 매출", money(s.revenue), "등록 관련 결제 − 환불"],
-      ]
-    : [
-        ["마케팅 비용", money(s.spend), `광고비 ${money(s.adSpend)}`],
-        ["순수납 매출", money(s.revenue), `결제 고객 ${number(s.payers)}명`],
-        ["객단가", money(s.aov), "순수납 / 결제 고객"],
-        [
-          "기간 마케팅 ROI",
-          percent(s.roi),
-          s.costMissing
-            ? `서비스 원가 미입력 ${s.costMissing}건`
-            : "원가·마케팅 비용 차감",
-        ],
-        [
-          "전체 등록당 비용",
-          money(s.cac),
-          `전체 신규 등록 ${number(s.enrollments)}명`,
-        ],
-      ];
-  return (
-    <div className={`kpi-grid${compact ? " kpi-compact" : ""}`} aria-label="월간 핵심 성과">
-      {cards.map(([label, value, hint], i) => (
-        <article key={label} className={`kpi ${i === 3 ? "accent" : ""}`}>
-          <span>{label}</span>
-          <strong>{value}</strong>
-          <small>{hint}</small>
-        </article>
-      ))}
-    </div>
-  );
-}
-function Analysis({ report: r }: { report: Report }) {
-  const s = r.summary;
-  const [level, setLevel] = useState("채널");
-  const max = Math.max(...r.trend.flatMap((t) => [t.spend, t.revenue ?? 0]), 1);
-  const min = Math.min(0, ...r.trend.map((t) => t.revenue ?? 0));
-  const y = (value: number) => 175 - (155 * (value - min)) / (max - min);
-  const points = (key: "spend" | "revenue") =>
-    r.trend
-      .map(
-        (t, i) =>
-          `${20 + (i * 960) / Math.max(r.trend.length - 1, 1)},${y(t[key] ?? 0)}`,
-      )
-      .join(" ");
-  return (
-    <>
-      <Kpis report={r} />
-      <div className="analysis-grid">
-        <section className="panel chart-panel">
-          <div className="section-toolbar">
-            <h2>지출과 매출의 흐름</h2>
-            <span className="chart-legend">
-              <i />
-              매출 <i />
-              비용
-            </span>
-          </div>
-          <p>동일 기간의 추이 · 활동의 인과적 기여를 뜻하지 않습니다.</p>
-          <svg
-            viewBox="0 0 1000 205"
-            role="img"
-            aria-label="기간별 마케팅 비용과 순수납 매출 추이"
-          >
-            <line x1="20" y1={y(0)} x2="980" y2={y(0)} stroke="#dce5df" />
-            <text x="20" y={y(0) - 5} fontSize="12" fill="#7b8d83">
-              0원
-            </text>
-            <line x1="20" y1="95" x2="980" y2="95" stroke="#edf1ed" />
-            {r.trend.some((t) => t.revenue !== null) && (
-              <polyline
-                fill="none"
-                stroke="#287a56"
-                strokeWidth="3"
-                points={points("revenue")}
-              />
-            )}
-            <polyline
-              fill="none"
-              stroke="#be884d"
-              strokeWidth="3"
-              points={points("spend")}
-            />
-            {r.trend
-              .filter(
-                (_, i) => i % Math.max(1, Math.floor(r.trend.length / 6)) === 0,
-              )
-              .map((t) => (
-                <text
-                  key={t.date}
-                  x={
-                    20 +
-                    (r.trend.indexOf(t) * 960) / Math.max(r.trend.length - 1, 1)
-                  }
-                  y="200"
-                  fontSize="13"
-                  textAnchor="middle"
-                  fill="#7b8d83"
-                >
-                  {t.date.slice(5)}
-                </text>
-              ))}
-          </svg>
-          <details>
-            <summary>일별 / 월별 수치 보기</summary>
-            <DataTable
-              headers={["기간", "지급 비용", "순수납", "등록"]}
-              rows={r.trend.map((t) => [
-                t.date,
-                money(t.spend),
-                money(t.revenue),
-                number(t.enrollments),
-              ])}
-            />
-          </details>
-        </section>
-        <section className="panel funnel-panel">
-          <small className="eyebrow">학원 전체 결과</small>
-          <h2>유입부터 등록까지</h2>
-          {[
-            ["유입", s.inflows],
-            ["상담 건수", s.consultations],
-            ["신규 등록", s.enrollments],
-          ].map(([label, value]) => (
-            <div className="funnel-step" key={String(label)}>
-              <span>{label}</span>
-              <strong>{number(value as number | null)}</strong>
-            </div>
-          ))}
-          <p>상담 건수에는 같은 사람의 여러 경로 상담이 포함될 수 있습니다.</p>
-          <div className="funnel-foot">
-            <span>확인 고객 상담→등록</span>
-            <b>{percent(s.conversion)}</b>
-            <small>
-              기간 내 최초 상담 {s.cohort}명 중 종료일까지 등록{" "}
-              {s.cohortEnrolled}명
-            </small>
-          </div>
-        </section>
-      </div>
-      <section className="panel">
-        <div className="section-toolbar">
-          <div>
-            <h2>활동별 비용과 확인 성과</h2>
-            <p>고객 답변·직접 확인한 주 출처 기준. 미확인은 별도로 남깁니다.</p>
-          </div>
-          <select
-            aria-label="분석 대상"
-            value={level}
-            onChange={(e) => setLevel(e.target.value)}
-          >
-            {["채널", "소재", "집행", "이벤트", "기타"].map((l) => (
-              <option key={l}>{l}</option>
-            ))}
-          </select>
-        </div>
-        <div className="coverage">
-          <span>
-            전체 신규 등록 <b>{number(s.enrollments)}명</b>
-          </span>
-          <span>
-            출처 확인 <b>{s.confirmedEnrollments}명</b>
-          </span>
-          <span>
-            확인률 <b>{percent(s.coverage)}</b>
-          </span>
-          {s.coverage !== null && s.coverage > 1 && (
-            <strong>전체 등록 집계와 고객 기록을 대조하세요.</strong>
-          )}
-        </div>
-        <DataTable
-          headers={[
-            "활동",
-            "지급 비용",
-            "확인 상담",
-            "확인 등록",
-            "확인 매출",
-            "객단가",
-            "확인 등록당 비용",
-            ...(level === "집행" ? ["광고 ROAS"] : []),
-          ]}
-          rows={r.activities
-            .filter((a) => a.kind === level)
-            .map((a) => [
-              a.name,
-              money(a.spend),
-              number(a.consultations),
-              number(a.enrollments),
-              money(a.revenue),
-              money(a.aov),
-              money(a.costPerEnrollment),
-              ...(level === "집행" ? [number(a.roas, "배")] : []),
-            ])}
-        />
-      </section>
-      <details className="panel calculation-notes">
-        <summary>계산 기준과 데이터 범위</summary>
-        {r.notes.map((n) => (
-          <p key={n}>{n}</p>
-        ))}
-      </details>
-    </>
   );
 }

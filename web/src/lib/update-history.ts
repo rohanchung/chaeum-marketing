@@ -9,6 +9,19 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260929-header-structure-review",
+    date: "2026-09-29",
+    title: "전역 헤더 날짜 컨트롤과 전 페이지 화면 정리",
+    room: "현재 제작방",
+    changes: [
+      "날짜 선택과 저장 상태를 상단 헤더로 옮기고 페이지마다 있던 날짜 줄을 없앴습니다. 구매·로그에서는 날짜 선택을 숨깁니다.",
+      "한 페이지 안의 중복 버튼을 정리했습니다: 업무의 ＋ 업무 하나로 통합, 대시보드 입력 메뉴의 채널 추가 제거, 콘텐츠 채널 관리 버튼은 관리 패널로 이동.",
+      "모든 페이지 제목을 페이지 이름과 한 줄 설명으로 통일하고, 이벤트 상태를 한국어로 표시합니다.",
+      "앱 전체 글자 크기를 최소 11px로 맞췄습니다.",
+      "화면 코드를 역할별 파일로 나눴습니다(동작 변화 없음).",
+    ],
+  },
+  {
     id: "20260929-sheet-quiet-rows",
     date: "2026-09-29",
     title: "운영시트 행 도구 정리",

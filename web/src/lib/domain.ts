@@ -77,6 +77,12 @@ export type MarketingEvent = Base & {
   status: string;
   event_type: string;
 };
+export const eventStatusLabels: Record<string, string> = {
+  planned: "예정",
+  active: "진행 중",
+  completed: "완료",
+  cancelled: "취소",
+};
 export type Purchase = Base & {
   title: string;
   purchased_on: string;
