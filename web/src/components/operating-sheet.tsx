@@ -1,7 +1,8 @@
 "use client";
-import { money } from "@/lib/domain";
+import { eventStatusLabels, money } from "@/lib/domain";
 import { parseRank, rankText, rankSummary } from "@/lib/keyword-ranks";
 import { eventCost } from "@/lib/purchases";
+import { compareEvents, eventInPeriod, eventOnDate } from "@/lib/events";
 import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
 import {
   CellChange,
@@ -710,9 +711,7 @@ export function OperatingSheet({
                         ]
                       }
                     </small>
-                    {data.events.some(
-                      (e) => !e.deleted_at && datePart(e.starts_at) === date,
-                    ) && <i className="event-dot" />}
+                    {data.events.some((e) => eventOnDate(e, date)) && <i className="event-dot" />}
                   </button>
                 </th>
               ))}
@@ -723,26 +722,20 @@ export function OperatingSheet({
               <th className="label-col">이벤트 · 날짜를 눌러 기록</th>
               <td className="summary-col">
                 {
-                  data.events.filter(
-                    (e) =>
-                      !e.deleted_at &&
-                      datePart(e.starts_at) >= period.start &&
-                      datePart(e.starts_at) <= period.end,
-                  ).length
+                  data.events.filter((e) => !e.deleted_at && eventInPeriod(e, period)).length
                 }
                 건
               </td>
               {ds.map((date) => (
                 <td key={date} className={date === today ? "today-col" : ""}>
                   {data.events
-                    .filter(
-                      (e) => !e.deleted_at && datePart(e.starts_at) === date,
-                    )
+                    .filter((e) => eventOnDate(e, date))
+                    .sort(compareEvents)
                     .map((e) => (
                       <button
                         key={e.id}
-                        className="event-marker"
-                        title={`${e.title} · 원가 ${money(eventCost(data, e.id).total)}`}
+                        className={`event-marker${e.status === "completed" ? " done" : ""}`}
+                        title={`${e.title} · ${eventStatusLabels[e.status] ?? e.status} · 원가 ${money(eventCost(data, e.id).total)}`}
                         onClick={() =>
                           onEdit({ collection: "events", record: e })
                         }

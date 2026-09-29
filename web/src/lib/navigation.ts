@@ -1,6 +1,7 @@
 export const navigationTabs = [
   "대시보드",
   "업무",
+  "흐름",
   "콘텐츠",
   "이벤트",
   "구매",
@@ -11,6 +12,7 @@ export const navigationTabs = [
 const routes = [
   "dashboard",
   "tasks",
+  "flow",
   "contents",
   "events",
   "purchases",

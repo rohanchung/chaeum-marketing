@@ -44,6 +44,7 @@ import {
   saveMetricOrder,
   saveChannelOrder,
   saveRecord,
+  saveTaskFlow,
   updateRecord,
 } from "@/lib/repository";
 import { downloadExcelReport, openPrintableReport } from "@/lib/report-export";
@@ -56,17 +57,20 @@ import { moveChannel } from "@/lib/channel-order";
 import { eventCost, unitCost, usedQuantity } from "@/lib/purchases";
 import { UpdateLog } from "@/components/update-log";
 import { useNavigation } from "@/components/use-navigation";
+import { navigationTabs } from "@/lib/navigation";
 import {
   TaskWorkspace,
 } from "@/components/task-workspace";
 import { ContentLibrary } from "@/components/content-library";
+import { FlowWorkspace } from "@/components/flow-workspace";
 import { BrandMark, DataTable, Empty, PageTitle } from "@/components/ui";
 import { AppHeader, PeriodRange } from "@/components/app-header";
 import { Kpis } from "@/components/kpis";
 import { Analysis } from "@/components/analysis";
 import { firstOpenOccurrence } from "@/lib/task-recurrence";
+import { compareEvents, eventInPeriod, eventOnDate, toggledEventStatus } from "@/lib/events";
 
-const tabs = ["대시보드", "업무", "콘텐츠", "이벤트", "구매", "분석", "리포트", "로그"];
+const tabs = navigationTabs;
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
 const koreanClock = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -98,6 +102,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [undo, setUndo] = useState<CellChange[] | null>(null);
+  const [flowDirty, setFlowDirty] = useState(false);
   const queue = useRef(Promise.resolve());
   const generation = useRef(0);
   const stateRef = useRef(data);
@@ -517,6 +522,14 @@ export default function Home() {
         tabs={tabs}
         nav={nav}
         onNav={(tab) => {
+          if (
+            nav === "흐름" &&
+            tab !== "흐름" &&
+            flowDirty &&
+            !window.confirm("저장하지 않은 흐름 변경이 있습니다. 버리고 이동할까요?")
+          )
+            return;
+          if (nav === "흐름" && tab !== "흐름") setFlowDirty(false);
           setNav(tab);
           setSelectedReport(null);
           setLifecycle("active");
@@ -532,7 +545,7 @@ export default function Home() {
                 : "데이터 확인 필요"
         }
         periodMode={
-          nav === "로그" || nav === "구매"
+          nav === "로그" || nav === "구매" || nav === "흐름"
             ? "none"
             : nav === "대시보드" || nav === "업무" || nav === "콘텐츠"
               ? "month"
@@ -558,7 +571,7 @@ export default function Home() {
           })
         }
       />
-      <div className={`workspace${nav === "대시보드" ? " dashboard-page" : nav === "콘텐츠" ? " content-page" : nav === "업무" ? " task-page" : ""}`}>
+      <div className={`workspace${nav === "대시보드" ? " dashboard-page" : nav === "콘텐츠" ? " content-page" : nav === "업무" ? " task-page" : nav === "흐름" ? " flow-shell" : ""}`}>
         {error && (
           <div className="error-box" role="alert">
             <strong>작업을 확인해 주세요.</strong> {error}{" "}
@@ -697,6 +710,23 @@ export default function Home() {
                   edit({ collection: "events", record: event ? objectRecord(event) : { starts_at: timestamp(date ?? today) } });
                 }}
                 onCompleteRecurring={completeRecurringTask}
+              />
+            )}
+            {nav === "흐름" && (
+              <FlowWorkspace
+                data={data}
+                today={today}
+                serverNow={serverNow}
+                onSaveFlow={(rows) =>
+                  run(async () => {
+                    await saveTaskFlow(workspace!, rows);
+                    await refresh(workspace!);
+                    setLastSavedAt(serverNow);
+                    setNotice(`흐름을 저장했습니다. 업무 ${rows.length}건이 업무 페이지에 반영됐습니다.`);
+                  })
+                }
+                onSaveProject={(collection, record) => mutate(collection, record)}
+                onDirtyChange={setFlowDirty}
               />
             )}
             {nav === "콘텐츠" && (
@@ -872,25 +902,45 @@ export default function Home() {
                 </label>
                 <div className="event-list">
                   {data.events
-                    .filter(
-                      (e) =>
-                        show(e) &&
-                        datePart(e.starts_at) <= period.end &&
-                        (datePart(e.ends_at) || datePart(e.starts_at)) >=
-                          period.start,
-                    )
+                    .filter((e) => show(e) && eventInPeriod(e, period))
+                    .sort(compareEvents)
                     .map((e) => (
-                      <article className="event-card" key={e.id}>
+                      <article className={`event-card${e.status === "completed" ? " done" : ""}`} key={e.id}>
                         <div className="event-date">
                           <b>{datePart(e.starts_at).slice(-2)}</b>
                           <small>{datePart(e.starts_at).slice(0, 7)}</small>
                         </div>
                         <div>
-                          <h2>{e.title}</h2>
+                          <h2>
+                            {!e.deleted_at && (
+                              <input
+                                type="checkbox"
+                                className="task-event-check"
+                                checked={e.status === "completed"}
+                                aria-label={`${e.title} 이벤트 완료`}
+                                onChange={() => changeState("events", e.id, { status: toggledEventStatus(e) })}
+                              />
+                            )}
+                            {e.title}
+                          </h2>
                           <p>
                             {e.location || "장소 미입력"} · {eventStatusLabels[e.status] ?? e.status}
+                            {e.ends_at && datePart(e.ends_at) !== datePart(e.starts_at) ? ` · ~${datePart(e.ends_at).slice(5).replace("-", "/")}` : ""}
                           </p>
-                          <p>{e.notes || "결과 메모를 남겨보세요."}</p>
+                          {/* Result memo is edited in place and saved when the field loses focus. */}
+                          <textarea
+                            key={`${e.id}:${e.notes ?? ""}`}
+                            className="event-memo"
+                            rows={2}
+                            aria-label={`${e.title} 결과 메모`}
+                            placeholder="결과 메모를 남겨보세요. 입력 후 다른 곳을 누르면 저장됩니다."
+                            defaultValue={e.notes ?? ""}
+                            disabled={!!e.deleted_at}
+                            onBlur={(event) => {
+                              const notes = event.target.value.trim() || null;
+                              if (notes !== (e.notes ?? null)) changeState("events", e.id, { notes });
+                            }}
+                          />
                           <small>
                             이벤트 원가 {money(eventCost(data, e.id).total)} ·
                             물품 {money(eventCost(data, e.id).goods)} + 직접
@@ -1393,22 +1443,26 @@ export default function Home() {
                 </button>
               </div>
               {data.events
-                .filter(
-                  (e) => !e.deleted_at && datePart(e.starts_at) === eventDate,
-                )
+                .filter((e) => eventOnDate(e, eventDate))
+                .sort(compareEvents)
                 .map((e) => (
-                  <div key={e.id} className="event-day-item">
+                  <div key={e.id} className={`event-day-item${e.status === "completed" ? " done" : ""}`}>
+                    <input
+                      type="checkbox"
+                      className="task-event-check"
+                      checked={e.status === "completed"}
+                      aria-label={`${e.title} 이벤트 완료`}
+                      onChange={() => changeState("events", e.id, { status: toggledEventStatus(e) })}
+                    />
                     <span>
                       {e.title}
-                      {e.location ? ` · ${e.location}` : ""} · 원가{" "}
+                      {e.location ? ` · ${e.location}` : ""} · {eventStatusLabels[e.status] ?? e.status} · 원가{" "}
                       {money(eventCost(data, e.id).total)}
                     </span>
                     {lifecycleActions("events", e)}
                   </div>
                 ))}
-              {!data.events.some(
-                (e) => !e.deleted_at && datePart(e.starts_at) === eventDate,
-              ) && <p className="day-activity-empty">기록된 이벤트가 없습니다.</p>}
+              {!data.events.some((e) => eventOnDate(e, eventDate)) && <p className="day-activity-empty">기록된 이벤트가 없습니다.</p>}
             </section>
           </section>
         </div>

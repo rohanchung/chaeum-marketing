@@ -75,6 +75,21 @@ export async function saveRecord(
   if (!data) throw new Error("저장 결과를 확인하지 못했습니다.");
   return data;
 }
+/**
+ * Saves a whole task flow in one request. PostgREST runs a bulk upsert as a
+ * single statement, so every row is saved or none is; rows may reference each
+ * other (depends_on_task_id) in any order.
+ */
+export async function saveTaskFlow(
+  workspace: string,
+  rows: Record<string, unknown>[],
+) {
+  if (!rows.length) return;
+  const { error } = await supabase
+    .from(tables.tasks)
+    .upsert(rows.map((row) => ({ ...row, workspace_id: workspace })), { onConflict: "id" });
+  if (error) throw new Error(error.message);
+}
 export async function updateRecord(
   workspace: string,
   collection: Collection,

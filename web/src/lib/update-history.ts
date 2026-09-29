@@ -9,6 +9,18 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260929-events-sync-and-flow",
+    date: "2026-09-29",
+    title: "흐름 페이지·이벤트 표시 통일·결과 메모 바로 쓰기",
+    room: "현재 제작방",
+    changes: [
+      "흐름 페이지를 추가했습니다. 프로젝트별로 할 일을 적고 앞 일·뒤 일을 이어 붙여 날짜까지 정리한 뒤, 저장하면 업무 페이지에 한 번에 반영됩니다.",
+      "대시보드·업무·이벤트 페이지가 같은 기준으로 이벤트를 표시합니다. 여러 날 이벤트는 모든 날에 나오고, 완료 표시도 모든 화면에서 같습니다.",
+      "이벤트 페이지와 대시보드 날짜 창에서도 이벤트를 체크해 완료할 수 있습니다.",
+      "이벤트 카드의 결과 메모를 수정 버튼 없이 바로 쓰고, 다른 곳을 누르면 저장됩니다.",
+    ],
+  },
+  {
     id: "20260929-header-structure-review",
     date: "2026-09-29",
     title: "전역 헤더 날짜 컨트롤과 전 페이지 화면 정리",

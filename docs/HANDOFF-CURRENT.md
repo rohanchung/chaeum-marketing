@@ -9,6 +9,7 @@
 - **업무 캘린더:** [1단계](update-20260929-task-calendar-overflow.md). 주 높이는 일정 수에 따라 2~10줄로 늘고, 그 이상은 `+N개`. 캘린더 제목줄 없이 요일줄이 헤더 아래에 붙는다. 월 전환은 `Shift + 휠`. 캘린더 크기 CSS는 `globals.css` 맨 아래 블록 하나만 수정한다.
 - **오늘 보드·업무 카드:** [2·3단계](update-20260929-task-today-board.md). 오른쪽 패널 기본은 오늘 보드(기한 초과/오늘/반복/날짜 미정). 날짜 없는 업무를 다시 허용한다.
 - **전역 헤더·페이지 검토·구조:** [5단계](update-20260929-header-structure-review.md). 날짜 컨트롤과 저장 상태는 헤더 하나에만 둔다(페이지에 다시 만들지 않는다). 한 페이지 안에 같은 동작 버튼을 두지 않는다. 최소 글자 11px. 업무 화면 코드는 `task-form / task-row / task-shared / lib/task-*`로 나뉘어 있다.
+- **흐름·이벤트:** [흐름 페이지·이벤트 표시 통일](update-20260929-events-sync-and-flow.md). 이벤트를 보여 주는 모든 화면은 `lib/events.ts` 기준만 쓴다. 흐름은 가지치기형(앞 일 = `depends_on_task_id`)·프로젝트별이며 저장은 `saveTaskFlow` 일괄 upsert 한 번이다.
 - **대시보드:** [4단계](update-20260929-sheet-quiet-rows.md). 행 도구는 호버·포커스 때만 표시, 삭제한 지표 복원은 `⋯` 메뉴.
 
 ## 이전 결정 (계속 유효)

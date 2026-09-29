@@ -2,6 +2,7 @@
 
 import { DragEvent, WheelEvent, useMemo, useRef, useState } from "react";
 import { Data, MarketingEvent, Task, TaskChecklistItem, WorkProject, dates, eventStatusLabels, monthPeriod, timestamp } from "@/lib/domain";
+import { compareEvents, eventOnDate, eventSpan, toggledEventStatus } from "@/lib/events";
 import { SourceFilter, materializedTasks, matchesSource, todayBoard } from "@/lib/task-board";
 import { addDays, dateOnly, dayDistance, dueTimestamp, taskRecordId } from "@/lib/task-dates";
 import {
@@ -172,9 +173,8 @@ export function TaskWorkspace({
         }] : [];
       });
     const eventBars = activeEvents.flatMap((event) => {
-      const start = dateOnly(event.starts_at);
-      const end = dateOnly(event.ends_at) ?? start;
-      const segment = start && end ? weekSegment(week, start, end) : null;
+      const span = eventSpan(event);
+      const segment = weekSegment(week, span.start, span.end);
       return segment ? [{
         kind: "event" as const,
         event,
@@ -243,11 +243,9 @@ export function TaskWorkspace({
     for (const task of ordered) addTask(task, 0);
     return cards;
   })();
-  const dailyEvents = activeEvents.filter((event) => {
-    const start = dateOnly(event.starts_at);
-    const end = dateOnly(event.ends_at) ?? start;
-    return !!start && !!end && start <= selectedDate && selectedDate <= end;
-  });
+  const dailyEvents = activeEvents
+    .filter((event) => eventOnDate(event, selectedDate))
+    .sort(compareEvents);
   const moveTaskToDate = (taskId: string, targetDate: string) => {
     const task = visibleTasks.find((item) => item.id === taskId) ?? materialized.find((item) => item.id === taskId);
     if (!task || task.recurrence_template_id) return;
@@ -368,12 +366,9 @@ export function TaskWorkspace({
     setDraggedListTaskId(null);
     setListDropTarget(null);
   };
-  // Event completion is only toggled here on the task page; the event editor
-  // keeps the full status choice.
+  // The checkbox toggles completed ↔ planned; the event editor keeps the full status choice.
   const toggleEvent = (event: MarketingEvent) => {
-    onUpdate("events", event.id, {
-      status: event.status === "completed" ? "planned" : "completed",
-    });
+    onUpdate("events", event.id, { status: toggledEventStatus(event) });
   };
   const renderTaskRow = (task: Task, depth: number, reorderable: boolean) => (
     <TaskRow
