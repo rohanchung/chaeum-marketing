@@ -14,7 +14,7 @@ require.extensions[".ts"] = (module, file) =>
     file,
   );
 
-const { nextTaskOccurrence, recurringDatesInRange, recurrenceText } = require("../src/lib/task-recurrence.ts");
+const { firstOpenOccurrence, nextTaskOccurrence, recurringDatesInRange, recurrenceText } = require("../src/lib/task-recurrence.ts");
 
 const task = (overrides = {}) => ({
   recurrence_frequency: "daily",
@@ -38,10 +38,32 @@ test("monthly recurrence keeps the anchor day and respects its end date", () => 
   assert.equal(nextTaskOccurrence({ ...monthly, recurrence_until: "2026-03-30" }, "2026-02-28"), null);
 });
 
-test("daily recurrence materializes every future calendar date in the month", () => {
+test("daily recurrence materializes every occurrence from the series start", () => {
   assert.deepEqual(
-    recurringDatesInRange(task({ recurrence_next_on: "2026-09-28", recurrence_active: true }), "2026-09-01", "2026-09-30"),
+    recurringDatesInRange(task({ start_at: "2026-09-28T03:00:00.000Z", recurrence_next_on: "2026-09-28" }), "2026-09-01", "2026-09-30"),
     ["2026-09-28", "2026-09-29", "2026-09-30"],
+  );
+});
+
+test("completed and missed occurrences stay in the calendar range", () => {
+  // A next_on that moved past 09-22 must not hide the earlier occurrences.
+  assert.deepEqual(
+    recurringDatesInRange(task({ recurrence_next_on: "2026-09-24" }), "2026-09-20", "2026-09-23"),
+    ["2026-09-21", "2026-09-22", "2026-09-23"],
+  );
+  assert.deepEqual(
+    recurringDatesInRange(task({ recurrence_until: "2026-09-22" }), "2026-09-01", "2026-09-30"),
+    ["2026-09-21", "2026-09-22"],
+  );
+});
+
+test("the next open occurrence is the earliest unfinished one", () => {
+  // Completing a later day while an earlier day was missed keeps the missed day open.
+  assert.equal(firstOpenOccurrence(task(), new Set(["2026-09-22"])), "2026-09-21");
+  assert.equal(firstOpenOccurrence(task(), new Set(["2026-09-21", "2026-09-22"])), "2026-09-23");
+  assert.equal(
+    firstOpenOccurrence(task({ recurrence_until: "2026-09-22" }), new Set(["2026-09-21", "2026-09-22"])),
+    null,
   );
 });
 

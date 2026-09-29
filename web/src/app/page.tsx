@@ -61,7 +61,7 @@ import {
   TaskWorkspace,
 } from "@/components/task-workspace";
 import { ContentLibrary } from "@/components/content-library";
-import { nextTaskOccurrence } from "@/lib/task-recurrence";
+import { firstOpenOccurrence } from "@/lib/task-recurrence";
 
 const tabs = ["대시보드", "업무", "콘텐츠", "이벤트", "구매", "분석", "리포트", "로그"];
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
@@ -353,31 +353,26 @@ export default function Home() {
     const occurrenceOn = task.occurrence_on;
     if (!workspace || !occurrenceOn) return;
     await run(async () => {
-      const { error: occurrenceError } = await supabase
-        .from("mkt_task_occurrences")
-        .upsert(
-          {
-            workspace_id: workspace,
-            task_id: templateId,
-            occurrence_on: occurrenceOn,
-            status: completed ? "done" : "planned",
-            completed_at: completed ? serverNow : null,
-          },
-          { onConflict: "workspace_id,task_id,occurrence_on" },
-        );
-      if (occurrenceError) throw occurrenceError;
       const base = stateRef.current.tasks.find((item) => item.id === templateId);
       if (!base) throw new Error("반복 업무 원본을 찾지 못했습니다.");
-      const next = completed ? nextTaskOccurrence(base, occurrenceOn) : occurrenceOn;
-      await updateRecord(workspace, "tasks", templateId, {
-        recurrence_next_on: next,
-        recurrence_active: next !== null,
-        status: next === null ? "done" : "planned",
-        completed_at: next === null ? serverNow : null,
+      const doneDates = new Set(
+        stateRef.current.taskOccurrences
+          .filter((item) => item.task_id === templateId && item.status === "done")
+          .map((item) => item.occurrence_on),
+      );
+      if (completed) doneDates.add(occurrenceOn);
+      else doneDates.delete(occurrenceOn);
+      const { error: occurrenceError } = await supabase.rpc("mkt_set_task_occurrence", {
+        p_workspace: workspace,
+        p_task: templateId,
+        p_occurrence_on: occurrenceOn,
+        p_done: completed,
+        p_next_on: firstOpenOccurrence(base, doneDates),
       });
+      if (occurrenceError) throw occurrenceError;
       await refresh(workspace);
       setLastSavedAt(serverNow);
-      setNotice(completed ? "반복 업무를 완료하고 다음 일정을 만들었습니다." : "반복 업무를 되돌렸습니다.");
+      setNotice(completed ? "반복 업무 회차를 완료했습니다." : "반복 업무 회차를 되돌렸습니다.");
     });
   }
   const changeState = (

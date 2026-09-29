@@ -643,8 +643,9 @@ export function OperatingSheet({
             ＋ 채널
           </button>
           <details className="quick-menu">
-            <summary>삭제한 지표</summary>
+            <summary title="더보기" aria-label="더보기">⋯</summary>
             <div>
+              <small className="quick-menu-heading">삭제한 지표 복원</small>
               {data.metrics
                 .filter((m) => m.deleted_at)
                 .map((m) => (
@@ -943,6 +944,8 @@ export function OperatingSheet({
                         <b>{r.label}</b>
                         <small>{r.detail}</small>
                       </button>
+                      {/* Row tools appear on hover or keyboard focus to keep the sheet quiet. */}
+                      <span className="row-actions">
                       {r.edit?.collection === "contents" && (
                         <button
                           className="row-add"
@@ -1068,6 +1071,7 @@ export function OperatingSheet({
                           </button>
                         </span>
                       )}
+                      </span>
                     </div>
                   </th>
                   <td
@@ -1083,6 +1087,7 @@ export function OperatingSheet({
                         {!r.fixedRollup && (
                           <select
                             aria-label={`${r.label} 요약 지표`}
+                            title={options.find((o) => o.id === selected)?.label}
                             value={selected}
                             onChange={(e) => {
                               const next = {

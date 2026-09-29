@@ -6,6 +6,7 @@ declare
   ws uuid := 'bef296c2-53ff-4865-8222-95bec0098350';
   area uuid;
   task uuid;
+  rejected boolean := false;
 begin
   select id into strict area
   from public.mkt_work_areas
@@ -23,25 +24,37 @@ begin
     'daily', 1, 1, '2026-09-21', true
   ) returning id into task;
 
-  insert into public.mkt_task_occurrences (
-    workspace_id, task_id, occurrence_on, status
-  ) values (ws, task, '2026-09-21', 'planned');
-
-  update public.mkt_task_occurrences
-  set status = 'done', completed_at = timezone('utc', now())
-  where workspace_id = ws and task_id = task and occurrence_on = '2026-09-21';
-  update public.mkt_tasks
-  set recurrence_next_on = '2026-09-22'
-  where id = task and workspace_id = ws;
-
+  -- Completing a later occurrence keeps the earlier missed one as the next open date.
+  perform public.mkt_set_task_occurrence(ws, task, '2026-09-22', true, '2026-09-21');
   if not exists (
     select 1 from public.mkt_task_occurrences
     where workspace_id = ws and task_id = task
-      and occurrence_on = '2026-09-21' and status = 'done'
+      and occurrence_on = '2026-09-22' and status = 'done' and completed_at is not null
   ) then raise exception 'occurrence completion was not saved'; end if;
-
-  if (select recurrence_next_on from public.mkt_tasks where id = task) <> '2026-09-22' then
-    raise exception 'next recurring date was not saved';
+  if (select recurrence_next_on from public.mkt_tasks where id = task) <> '2026-09-21' then
+    raise exception 'next open recurring date was not saved';
   end if;
+
+  -- Undoing reopens the occurrence without deleting its history row.
+  perform public.mkt_set_task_occurrence(ws, task, '2026-09-22', false, '2026-09-21');
+  if (select status from public.mkt_task_occurrences
+      where task_id = task and occurrence_on = '2026-09-22') <> 'planned' then
+    raise exception 'occurrence undo was not saved';
+  end if;
+
+  -- A finished series is marked done and inactive in the same call.
+  perform public.mkt_set_task_occurrence(ws, task, '2026-09-21', true, null);
+  if not exists (
+    select 1 from public.mkt_tasks
+    where id = task and status = 'done' and completed_at is not null
+      and recurrence_active = false and recurrence_next_on is null
+  ) then raise exception 'finished series was not closed'; end if;
+
+  -- Future occurrences cannot be completed in advance.
+  begin
+    perform public.mkt_set_task_occurrence(ws, task, '2099-01-01', true, null);
+  exception when others then rejected := true;
+  end;
+  if not rejected then raise exception 'future occurrence was accepted'; end if;
 end $$;
 rollback;

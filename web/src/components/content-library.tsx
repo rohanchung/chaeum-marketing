@@ -353,7 +353,8 @@ function ContentChannelGroup({
             <small>{contents.length ? `${contents.length}개` : "채널 지표"}</small>
           </button>
         </th>
-        <td className="content-group-value">{contents.length || "—"}</td>
+        {/* Contents use different headline metrics, so the channel row has no single monthly value. */}
+        <td className="content-group-value" title="소재마다 대표 지표가 달라 채널 합계를 표시하지 않습니다.">—</td>
         <td className="content-group-value">{money(groupSpend)}</td>
         <td />
       </tr>

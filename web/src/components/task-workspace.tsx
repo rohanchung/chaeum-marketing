@@ -17,6 +17,16 @@ import {
 } from "@/lib/domain";
 import { Collection } from "@/lib/repository";
 import { recurringDatesInRange, recurrenceText } from "@/lib/task-recurrence";
+import { SourceFilter, matchesSource, todayBoard } from "@/lib/task-board";
+import {
+  CALENDAR_DAY_HEADER,
+  CALENDAR_LANE_HEIGHT,
+  assignLanes,
+  hiddenBarsByColumn,
+  laneCapacity,
+  visibleLaneCount,
+  weekSegment,
+} from "@/lib/task-calendar";
 
 type Save = (collection: Collection, record: Record<string, unknown>) => Promise<void>;
 type Update = (
@@ -63,11 +73,8 @@ const koreanClock = (value: string) =>
     timeZone: "Asia/Seoul",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
     hour12: false,
   }).format(new Date(value));
-const activeTask = (task: Task) =>
-  !task.deleted_at && task.status !== "done" && task.status !== "cancelled";
 const useModalEscape = (onClose: () => void) => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -112,13 +119,21 @@ export function materializedTasks(
   return data.tasks
     .filter((task) => !task.deleted_at)
     .flatMap((task): Task[] => {
-      if (task.source_type !== "recurring" || !task.recurrence_active) return [task];
-      const nextOn = task.recurrence_next_on ?? dateOnly(task.start_at) ?? today;
-      const occurrenceDates = calendarRange
-        ? recurringDatesInRange(task, calendarRange.start, calendarRange.end)
-        : [nextOn];
-      return occurrenceDates.map((occurrenceOn) => {
+      if (task.source_type !== "recurring" || !task.recurrence_frequency) return [task];
+      // Without a calendar range, show the open occurrences from the earliest
+      // unfinished one through today, so missed occurrences stay visible.
+      const nextOn = task.recurrence_next_on;
+      const range = calendarRange ?? (nextOn
+        ? { start: nextOn, end: nextOn > today ? nextOn : today }
+        : null);
+      if (!range) return [];
+      return recurringDatesInRange(task, range.start, range.end).map((occurrenceOn) => {
         const occurrence = occurrences.get(`${task.id}:${occurrenceOn}`);
+        const status: TaskStatus = occurrence?.status === "done"
+          ? "done"
+          : occurrence?.status === "skipped"
+            ? "cancelled"
+            : "planned";
         return {
           ...task,
           id: `${task.id}:${occurrenceOn}`,
@@ -126,167 +141,18 @@ export function materializedTasks(
           occurrence_on: occurrenceOn,
           start_at: timestamp(occurrenceOn),
           due_at: dueTimestamp(occurrenceOn),
-          status: (occurrence?.status === "done" ? "done" : "planned") as TaskStatus,
+          status,
           completed_at: occurrence?.completed_at ?? null,
         } as Task;
       });
     });
 }
 
-export function TodayActivity({
-  data,
-  today,
-  onOpen,
-  onToggle,
-  onAdd,
-  onCompleteRecurring,
-}: {
-  data: Data;
-  today: string;
-  onOpen: () => void;
-  onToggle: (task: Task) => void;
-  onAdd: () => void;
-  onCompleteRecurring?: (task: Task, completed: boolean) => void | Promise<void>;
-}) {
-  const tasks = materializedTasks(data, today)
-    .filter((task) => {
-      if (!activeTask(task)) return false;
-      const start = dateOnly(task.start_at);
-      const due = dateOnly(task.due_at);
-      return start === today || due === today || (due !== null && due < today);
-    })
-    .sort((a, b) => {
-      const aDue = dateOnly(a.due_at) ?? "9999-12-31";
-      const bDue = dateOnly(b.due_at) ?? "9999-12-31";
-      return aDue.localeCompare(bDue) || a.sort_order - b.sort_order;
-    });
-  const projects = new Map(data.workProjects.map((p) => [p.id, p.name]));
-  const overdue = tasks.filter((task) => {
-    const due = dateOnly(task.due_at);
-    return due !== null && due < today;
-  }).length;
-  return (
-    <section className="today-activity panel">
-      <div className="section-toolbar">
-        <div>
-          <small className="eyebrow">PROJECT ACTIVITY</small>
-          <h2>오늘의 프로젝트 활동</h2>
-        </div>
-        <div className="inline-tools">
-          {overdue > 0 && <span className="task-alert">기한 초과 {overdue}</span>}
-          <button onClick={onOpen}>업무 페이지</button>
-          <button className="primary" onClick={onAdd}>
-            ＋ 업무
-          </button>
-        </div>
-      </div>
-      {tasks.length ? (
-        <div className="today-activity-scroll">
-          {tasks.slice(0, 12).map((task) => (
-            <div className="today-activity-item" key={task.id}>
-              <input
-                type="checkbox"
-                aria-label={`${task.title} 완료`}
-                checked={task.status === "done"}
-                onChange={() => {
-                  if (task.recurrence_template_id && onCompleteRecurring) {
-                    void Promise.resolve(onCompleteRecurring(task, task.status !== "done")).catch(() => {});
-                  } else onToggle(task);
-                }}
-              />
-              <div>
-                <strong>{task.title}</strong>
-                <small>
-                  {task.project_id ? projects.get(task.project_id) : "미분류 업무"}
-                  {task.requester_name ? ` · ${task.requester_name}` : ""}
-                </small>
-              </div>
-              <span
-                className={
-                  dateOnly(task.due_at) !== null && dateOnly(task.due_at)! < today
-                    ? "task-overdue"
-                    : ""
-                }
-              >
-                {dateLabel(task.due_at ?? task.start_at, today)}
-              </span>
-            </div>
-          ))}
-          {tasks.length > 12 && <button onClick={onOpen}>+ {tasks.length - 12}건 더 보기</button>}
-        </div>
-      ) : (
-        <div className="today-activity-empty">
-          오늘 등록된 프로젝트 활동이 없습니다. <button onClick={onAdd}>업무 추가</button>
-        </div>
-      )}
-    </section>
-  );
-}
-
-export function ProjectActivitySummary({
-  data,
-  today,
-  onOpen,
-}: {
-  data: Data;
-  today: string;
-  onOpen: (projectId: string) => void;
-}) {
-  const projects = data.workProjects
-    .filter((project) => !project.deleted_at && project.status === "active")
-    .sort((a, b) => a.sort_order - b.sort_order);
-  const allTasks = materializedTasks(data, today);
-  if (!projects.length) return null;
-  return (
-    <section className="project-summary panel">
-      <div className="section-toolbar">
-        <div>
-          <small className="eyebrow">ACTIVE PROJECTS</small>
-          <h2>진행 중 프로젝트</h2>
-        </div>
-        <button onClick={() => onOpen("")}>전체 업무</button>
-      </div>
-      <div className="project-summary-grid">
-        {projects.map((project) => {
-          const tasks = allTasks.filter(
-            (task) => activeTask(task) && task.project_id === project.id,
-          );
-          const next = tasks
-            .filter((task) => task.due_at)
-            .sort((a, b) => (a.due_at ?? "").localeCompare(b.due_at ?? ""))[0];
-          const done = allTasks.filter(
-            (task) =>
-              !task.deleted_at && task.project_id === project.id && task.status === "done",
-          ).length;
-          const total = allTasks.filter(
-            (task) => !task.deleted_at && task.project_id === project.id,
-          ).length;
-          return (
-            <button
-              className="project-summary-card"
-              key={project.id}
-              onClick={() => onOpen(project.id)}
-            >
-              <strong>{project.name}</strong>
-              <span>
-                {done}/{total} 완료 · 미완료 {tasks.length}
-              </span>
-              <small>
-                {next ? `다음 마감 ${dateLabel(next.due_at, today)}` : "다음 마감 없음"}
-              </small>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 export function TaskForm({
   data,
   today,
   now,
-  task,
+  task: editingTask,
   initialProjectId = "",
   initialDate = "",
   initialParentTaskId = "",
@@ -310,6 +176,11 @@ export function TaskForm({
   onClose: () => void;
 }) {
   useModalEscape(onClose);
+  // An occurrence of a recurring task edits its series record, so the series
+  // keeps its first date instead of moving to the clicked occurrence.
+  const task = editingTask?.recurrence_template_id
+    ? data.tasks.find((item) => item.id === editingTask.recurrence_template_id) ?? editingTask
+    : editingTask;
   const initialProject = task?.project_id ?? initialProjectId;
   const [title, setTitle] = useState(task?.title ?? initialTitle);
   const [projectId, setProjectId] = useState(initialProject);
@@ -331,21 +202,27 @@ export function TaskForm({
     String(task?.recurrence_interval ?? 1),
   );
   const [recurrenceUntil, setRecurrenceUntil] = useState(task?.recurrence_until ?? "");
-  const projects = data.workProjects.filter((project) => !project.deleted_at);
+  // Keep a trashed project selectable while this task still points to it;
+  // otherwise saving any other field would silently unlink the project.
+  const projects = data.workProjects.filter(
+    (project) => !project.deleted_at || project.id === task?.project_id,
+  );
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!title.trim()) return;
     const project = projects.find((item) => item.id === projectId);
     const recurring = sourceType === "recurring";
-    // A task created from the global action needs a calendar home even when the
-    // user does not touch either date field. Existing undated records can stay
-    // undated when they are edited.
-    const defaultStart = task ? "" : today;
-    const normalizedStart = recurring ? startOn || today : startOn || dueOn || defaultStart;
+    // New tasks open with today prefilled; clearing both dates keeps the task
+    // undated, and it then appears under "날짜 미정" on the today board.
+    const normalizedStart = recurring ? startOn || today : startOn || dueOn;
     const normalizedDue = recurring ? dueOn || normalizedStart : dueOn || normalizedStart;
+    // The earliest open occurrence can never precede the series start.
+    const seriesStart = normalizedStart || today;
     const recurrenceNextOn = recurring
-      ? (task?.recurrence_next_on ?? normalizedStart) || today
+      ? task?.recurrence_next_on && task.recurrence_next_on >= seriesStart
+        ? task.recurrence_next_on
+        : seriesStart
       : null;
     await onSave("tasks", {
       ...(task ? { id: task.recurrence_template_id ?? task.id } : {}),
@@ -400,7 +277,7 @@ export function TaskForm({
               <option value="">미분류 업무</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
-                  {project.name}
+                  {project.deleted_at ? `(휴지통) ${project.name}` : project.name}
                 </option>
               ))}
             </select>
@@ -471,11 +348,11 @@ export function TaskForm({
         )}
         <div className="form-pair">
           <label className="form-field">
-            <span>실행 예정일{!task ? " · 비우면 오늘" : ""}</span>
+            <span>실행 예정일</span>
             <input type="date" value={startOn} onChange={(event) => setStartOn(event.target.value)} />
           </label>
           <label className="form-field">
-            <span>마감일{!task ? " · 비우면 실행일" : ""}</span>
+            <span>마감일 · 둘 다 비우면 날짜 미정</span>
             <input type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} />
           </label>
         </div>
@@ -701,10 +578,12 @@ function TaskRow({
   today,
   serverNow,
   depth,
+  reorderable,
   dragging,
   dropPosition,
   onToggle,
   onEdit,
+  onResult,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -722,10 +601,12 @@ function TaskRow({
   today: string;
   serverNow: string;
   depth: number;
+  reorderable: boolean;
   dragging: boolean;
   dropPosition: CardDropPosition | null;
   onToggle: (task: Task) => void;
   onEdit: (task: Task) => void;
+  onResult: (task: Task, result: string) => void;
   onDragStart: (event: DragEvent<HTMLElement>, task: Task) => void;
   onDragOver: (event: DragEvent<HTMLElement>, task: Task) => void;
   onDragLeave: () => void;
@@ -741,6 +622,12 @@ function TaskRow({
   const [checklistDraft, setChecklistDraft] = useState("");
   const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
   const [editingChecklistTitle, setEditingChecklistTitle] = useState("");
+  // FR-016: after completing a task without a result, offer a one-line result
+  // input on the card. Completion never waits for it.
+  const [resultPrompt, setResultPrompt] = useState(false);
+  const [resultDraft, setResultDraft] = useState("");
+  const startOn = dateOnly(task.start_at);
+  const dueOn = dateOnly(task.due_at);
   const project = data.workProjects.find((item) => item.id === task.project_id);
   const parentTask = data.tasks.find((item) => item.id === task.depends_on_task_id && !item.deleted_at);
   const due = dateOnly(task.due_at);
@@ -757,11 +644,13 @@ function TaskRow({
     <article
       className={`task-row task-card${overdue ? " overdue" : ""}${task.status === "done" ? " done" : ""}${dragging ? " dragging" : ""}${dropPosition ? ` drop-${dropPosition}` : ""}`}
       style={{ marginLeft: `${Math.min(depth, 3) * 14}px` }}
-      draggable
+      draggable={reorderable}
       role="button"
       tabIndex={0}
       onClick={() => onEdit(task)}
       onKeyDown={(event) => {
+        // Keys typed into the card inputs (checklist, result) must not open the editor.
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onEdit(task);
@@ -787,22 +676,38 @@ function TaskRow({
         onClick={(event) => event.stopPropagation()}
         onChange={(event) => {
           event.stopPropagation();
+          const completing = task.status !== "done";
           onToggle(task);
+          setResultPrompt(completing && !task.recurrence_template_id && !task.result);
         }}
       />
       <div className="task-row-main">
         <strong>{task.title}</strong>
-        <small>
-          {sourceLabels[task.source_type]}
-          {task.recurrence_frequency ? ` · ${recurrenceText(task)}` : ""}
-          {task.requester_name ? ` · ${task.requester_name}` : ""}
-        </small>
-        {project && <small className="task-project-label">프로젝트 · {project.name}</small>}
-        <div className="task-row-dates">
-          <span>등록 {compactDate(task.created_at)}</span>
-          <span>실행 {compactDate(task.start_at)}</span>
-          <span>마감 {compactDate(task.due_at)}</span>
-        </div>
+        {task.source_type !== "self" && (
+          <small>
+            {sourceLabels[task.source_type]}
+            {task.recurrence_frequency ? ` · ${recurrenceText(task)}` : ""}
+            {task.requester_name ? ` · ${task.requester_name}` : ""}
+          </small>
+        )}
+        {project && (
+          <small className="task-project-label">
+            프로젝트 · {project.name}{project.deleted_at ? " (휴지통)" : ""}
+          </small>
+        )}
+        {(startOn || dueOn) && (
+          <div className="task-row-dates">
+            {startOn && dueOn && startOn !== dueOn ? (
+              <>
+                <span>실행 {compactDate(task.start_at)}</span>
+                <span>마감 {compactDate(task.due_at)}</span>
+              </>
+            ) : (
+              <span>{compactDate(task.due_at ?? task.start_at)}</span>
+            )}
+          </div>
+        )}
+        {task.result && <small className="task-result-label">결과 · {task.result}</small>}
         {parentTask && (
           <small className="task-dependency">
             상위 업무 · {parentTask.title}
@@ -826,6 +731,34 @@ function TaskRow({
       <span className={`task-due${overdue ? " task-overdue" : ""}`}>
         {dateLabel(task.due_at ?? task.start_at, today)}
       </span>
+      {resultPrompt && task.status === "done" && (
+        <form
+          className="task-result-prompt"
+          onClick={stopCardAction}
+          onSubmit={(event) => {
+            event.preventDefault();
+            const value = resultDraft.trim();
+            if (value) onResult(task, value);
+            setResultPrompt(false);
+          }}
+        >
+          <input
+            autoFocus
+            value={resultDraft}
+            aria-label={`${task.title} 처리 결과`}
+            placeholder="처리 결과 남기기 (선택)"
+            onChange={(event) => setResultDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setResultPrompt(false);
+              }
+            }}
+          />
+          <button type="submit" disabled={!resultDraft.trim()}>저장</button>
+          <button type="button" onClick={() => setResultPrompt(false)}>건너뛰기</button>
+        </form>
+      )}
       {checklistOpen && (
         <div
           className="task-checklist"
@@ -948,7 +881,8 @@ export function TaskWorkspace({
   initialCreate?: boolean;
   onCompleteRecurring?: (task: Task, completed: boolean) => void | Promise<void>;
 }) {
-  const [filters, setFilters] = useState<Array<"today" | "requested" | "recurring">>([]);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [panelMode, setPanelMode] = useState<"today" | "date">("today");
   const [showProjects, setShowProjects] = useState(false);
   const [taskEditor, setTaskEditor] = useState<Task | null | undefined>(initialCreate ? null : undefined);
   const [newTaskProjectId, setNewTaskProjectId] = useState("");
@@ -963,29 +897,31 @@ export function TaskWorkspace({
   const [listDropTarget, setListDropTarget] = useState<CardDropTarget | null>(null);
   const [openChecklistTaskIds, setOpenChecklistTaskIds] = useState<Set<string>>(new Set());
   const calendarWheelLocked = useRef(false);
+  const calendarGridRef = useRef<HTMLDivElement>(null);
+  const [calendarGridHeight, setCalendarGridHeight] = useState(0);
+  useEffect(() => {
+    const grid = calendarGridRef.current;
+    if (!grid) return;
+    const observer = new ResizeObserver(([entry]) => setCalendarGridHeight(entry.contentRect.height));
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, []);
   const materialized = useMemo(
     () => materializedTasks(data, today, monthPeriod(month)),
     [data, today, month],
   );
   const visibleTasks = useMemo(() => {
-    const tasks = filters.length
-      ? materialized.filter((task) => filters.some((filter) => {
-          if (filter === "today") {
-            const start = dateOnly(task.start_at);
-            const due = dateOnly(task.due_at);
-            return task.status !== "done" && task.status !== "cancelled" &&
-              (start === today || due === today || (due !== null && due < today));
-          }
-          if (filter === "requested") return task.source_type === "requested" && task.status !== "cancelled";
-          return task.source_type === "recurring" && task.status !== "cancelled";
-        }))
-      : [...materialized];
+    const tasks = materialized.filter((task) => matchesSource(task, sourceFilter));
     return tasks.sort((a, b) => {
       const aDue = dateOnly(a.due_at) ?? "9999-12-31";
       const bDue = dateOnly(b.due_at) ?? "9999-12-31";
       return aDue.localeCompare(bDue) || a.sort_order - b.sort_order;
     });
-  }, [materialized, filters, today]);
+  }, [materialized, sourceFilter]);
+  const board = useMemo(
+    () => todayBoard(materializedTasks(data, today).filter((task) => matchesSource(task, sourceFilter)), today),
+    [data, today, sourceFilter],
+  );
   const toggle = (task: Task) => {
     if (task.recurrence_template_id && task.occurrence_on && onCompleteRecurring) {
       if (task.occurrence_on > today) return;
@@ -1006,7 +942,14 @@ export function TaskWorkspace({
   ];
   while (calendarCells.length % 7 !== 0) calendarCells.push(null);
   const calendarTasks = new Map<string, Task[]>();
-  const selectCalendarDate = (day: string) => setSelectedDate(day);
+  const selectCalendarDate = (day: string) => {
+    setSelectedDate(day);
+    setPanelMode("date");
+  };
+  const showTodayBoard = () => {
+    setSelectedDate(today);
+    setPanelMode("today");
+  };
   const openTaskForDate = (day: string) => {
     selectCalendarDate(day);
     setNewTaskProjectId("");
@@ -1025,12 +968,16 @@ export function TaskWorkspace({
     const nextMonth = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
     setCalendarMonth(nextMonth);
   };
+  // Shift + wheel changes the month. Browsers may report Shift + wheel as a
+  // horizontal delta, so either axis counts.
   const handleCalendarWheel = (event: WheelEvent<HTMLDivElement>) => {
-    if (!event.deltaY || Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
+    if (!event.shiftKey) return;
+    const delta = event.deltaY || event.deltaX;
+    if (!delta) return;
     event.preventDefault();
     if (calendarWheelLocked.current) return;
     calendarWheelLocked.current = true;
-    moveCalendarMonth(event.deltaY > 0 ? 1 : -1);
+    moveCalendarMonth(delta > 0 ? 1 : -1);
     window.setTimeout(() => {
       calendarWheelLocked.current = false;
     }, 320);
@@ -1048,107 +995,69 @@ export function TaskWorkspace({
     }
   }
   const activeEvents = events.filter((event) => !event.deleted_at);
+  const laneLimit = laneCapacity(calendarGridHeight / Math.max(1, calendarCells.length / 7));
   const calendarWeeks = Array.from({ length: calendarCells.length / 7 }, (_, weekIndex) => {
     const week = calendarCells.slice(weekIndex * 7, weekIndex * 7 + 7);
-    const weekDays = week.filter((day): day is string => !!day);
-    const weekStart = weekDays[0];
-    const weekEnd = weekDays[weekDays.length - 1];
-    const showProjectBars = showProjects;
-    const projectBars = !weekStart || !weekEnd || !showProjectBars ? [] : data.workProjects
+    const projectBars = !showProjects ? [] : data.workProjects
       .filter((project) => !project.deleted_at && project.start_on && project.due_on)
       .flatMap((project) => {
-        const rangeStart = project.start_on! <= project.due_on! ? project.start_on! : project.due_on!;
-        const rangeEnd = project.start_on! <= project.due_on! ? project.due_on! : project.start_on!;
-        if (rangeEnd < weekStart || rangeStart > weekEnd) return [];
-        const segmentStart = rangeStart < weekStart ? weekStart : rangeStart;
-        const segmentEnd = rangeEnd > weekEnd ? weekEnd : rangeEnd;
-        const startColumn = week.findIndex((day) => day === segmentStart) + 1;
-        const endColumn = week.findIndex((day) => day === segmentEnd) + 2;
-        if (startColumn < 1 || endColumn <= startColumn) return [];
-        return [{
+        const segment = weekSegment(week, project.start_on!, project.due_on!);
+        return segment ? [{
           kind: "project" as const,
           project,
-          startColumn,
-          endColumn,
-          lane: 0,
-          label: segmentStart === rangeStart ? project.name : `↳ ${project.name}`,
-        }];
+          ...segment,
+          label: segment.continues ? `↳ ${project.name}` : project.name,
+        }] : [];
       });
-    const eventBars = !weekStart || !weekEnd ? [] : activeEvents.flatMap((event) => {
+    const eventBars = activeEvents.flatMap((event) => {
       const start = dateOnly(event.starts_at);
-      const due = dateOnly(event.ends_at) ?? start;
-      if (!start || !due) return [];
-      const rangeStart = start <= due ? start : due;
-      const rangeEnd = start <= due ? due : start;
-      if (rangeEnd < weekStart || rangeStart > weekEnd) return [];
-      const segmentStart = rangeStart < weekStart ? weekStart : rangeStart;
-      const segmentEnd = rangeEnd > weekEnd ? weekEnd : rangeEnd;
-      const startColumn = week.findIndex((day) => day === segmentStart) + 1;
-      const endColumn = week.findIndex((day) => day === segmentEnd) + 2;
-      if (startColumn < 1 || endColumn <= startColumn) return [];
-      return [{
+      const end = dateOnly(event.ends_at) ?? start;
+      const segment = start && end ? weekSegment(week, start, end) : null;
+      return segment ? [{
         kind: "event" as const,
         event,
-        startColumn,
-        endColumn,
-        lane: 0,
-        label: segmentStart === rangeStart ? event.title : `↳ ${event.title}`,
-      }];
+        ...segment,
+        label: segment.continues ? `↳ ${event.title}` : event.title,
+      }] : [];
     });
-    const taskBars = !weekStart || !weekEnd ? [] : visibleTasks.flatMap((task) => {
+    const taskBars = visibleTasks.flatMap((task) => {
       const start = dateOnly(task.start_at) ?? dateOnly(task.due_at);
-      const due = dateOnly(task.due_at) ?? start;
-      if (!start || !due) return [];
-      const rangeStart = start <= due ? start : due;
-      const rangeEnd = start <= due ? due : start;
-      if (rangeEnd < weekStart || rangeStart > weekEnd) return [];
-      const segmentStart = rangeStart < weekStart ? weekStart : rangeStart;
-      const segmentEnd = rangeEnd > weekEnd ? weekEnd : rangeEnd;
-      const startColumn = week.findIndex((day) => day === segmentStart) + 1;
-      const endColumn = week.findIndex((day) => day === segmentEnd) + 2;
-      if (startColumn < 1 || endColumn <= startColumn) return [];
-      return [{
+      const end = dateOnly(task.due_at) ?? start;
+      const segment = start && end ? weekSegment(week, start, end) : null;
+      return segment ? [{
         kind: "task" as const,
         task,
-        startColumn,
-        endColumn,
-        lane: 0,
-        label: segmentStart === rangeStart ? task.title : `↳ ${task.title}`,
-      }];
+        ...segment,
+        label: segment.continues ? `↳ ${task.title}` : task.title,
+      }] : [];
     });
     const priority = { event: 0, task: 1, project: 2 } as const;
-    const bars = [...projectBars, ...eventBars, ...taskBars]
-      .sort((a, b) =>
+    const { bars, laneCount } = assignLanes(
+      [...projectBars, ...eventBars, ...taskBars].sort((a, b) =>
         priority[a.kind] - priority[b.kind] ||
         a.startColumn - b.startColumn ||
         a.endColumn - b.endColumn,
-      );
-    const lanes: Array<Array<{ startColumn: number; endColumn: number }>> = [];
-    const positionedBars = bars.map((bar) => {
-      let lane = lanes.findIndex((items) =>
-        items.every(
-          (item) =>
-            item.endColumn <= bar.startColumn || item.startColumn >= bar.endColumn,
-        ),
-      );
-      if (lane < 0) {
-        lane = lanes.length;
-        lanes.push([]);
-      }
-      lanes[lane].push({
-        startColumn: bar.startColumn,
-        endColumn: bar.endColumn,
-      });
-      return { ...bar, lane };
-    });
-    return { week, bars: positionedBars, laneCount: Math.max(1, lanes.length) };
+      ),
+    );
+    const visibleLanes = visibleLaneCount(laneCount, laneLimit);
+    return {
+      week,
+      bars: bars.filter((bar) => bar.lane < visibleLanes),
+      hidden: hiddenBarsByColumn(bars, visibleLanes),
+      overflowLane: visibleLanes,
+    };
   });
   const dailyTasks = (calendarTasks.get(selectedDate) ?? []).filter(
     (task, index, tasks) => tasks.findIndex((item) => item.id === task.id) === index,
   );
   const dailyTaskCards = (() => {
+    // Finished tasks sink below open ones; open tasks keep the manual order.
+    const finished = (task: Task) => task.status === "done" || task.status === "cancelled";
     const ordered = [...dailyTasks].sort(
-      (a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title, "ko"),
+      (a, b) =>
+        Number(finished(a)) - Number(finished(b)) ||
+        a.sort_order - b.sort_order ||
+        a.title.localeCompare(b.title, "ko"),
     );
     const tasksById = new Map(ordered.map((task) => [taskRecordId(task), task]));
     const children = new Map<string, Task[]>();
@@ -1176,12 +1085,6 @@ export function TaskWorkspace({
     const end = dateOnly(event.ends_at) ?? start;
     return !!start && !!end && start <= selectedDate && selectedDate <= end;
   });
-  const toggleFilter = (value: "today" | "requested" | "recurring") => {
-    setFilters((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
-  };
-  const resetFilters = () => {
-    setFilters([]);
-  };
   const moveTaskToDate = (taskId: string, targetDate: string) => {
     const task = visibleTasks.find((item) => item.id === taskId) ?? materialized.find((item) => item.id === taskId);
     if (!task || task.recurrence_template_id) return;
@@ -1242,12 +1145,14 @@ export function TaskWorkspace({
     }
     return false;
   };
+  // Dropping on the right third of a card nests the task under it; anywhere
+  // else only reorders, so a plain reorder cannot nest a task by accident.
   const cardDropPosition = (event: DragEvent<HTMLElement>): CardDropPosition => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const offset = (event.clientY - bounds.top) / Math.max(bounds.height, 1);
-    if (offset < 0.25) return "before";
-    if (offset > 0.75) return "after";
-    return "child";
+    const x = (event.clientX - bounds.left) / Math.max(bounds.width, 1);
+    if (x > 2 / 3) return "child";
+    const y = (event.clientY - bounds.top) / Math.max(bounds.height, 1);
+    return y < 0.5 ? "before" : "after";
   };
   const startTaskCardDrag = (event: DragEvent<HTMLElement>, task: Task) => {
     const id = taskRecordId(task);
@@ -1300,6 +1205,43 @@ export function TaskWorkspace({
     setDraggedListTaskId(null);
     setListDropTarget(null);
   };
+  const renderTaskRow = (task: Task, depth: number, reorderable: boolean) => (
+    <TaskRow
+      key={task.id}
+      task={task}
+      data={data}
+      today={today}
+      serverNow={serverNow}
+      depth={depth}
+      reorderable={reorderable}
+      dragging={draggedListTaskId === taskRecordId(task)}
+      dropPosition={listDropTarget?.id === taskRecordId(task) ? listDropTarget.position : null}
+      onToggle={toggle}
+      onEdit={(item) => setTaskEditor(item)}
+      onResult={(item, result) => onUpdate("tasks", taskRecordId(item), { result, updated_at: serverNow })}
+      onDragStart={startTaskCardDrag}
+      onDragOver={(event, target) => {
+        if (!draggedListTaskId || draggedListTaskId === taskRecordId(target)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        setListDropTarget({ id: taskRecordId(target), position: cardDropPosition(event) });
+      }}
+      onDragLeave={() => {
+        if (listDropTarget?.id === taskRecordId(task)) setListDropTarget(null);
+      }}
+      onDrop={dropTaskCard}
+      onDragEnd={() => {
+        setDraggedListTaskId(null);
+        setListDropTarget(null);
+      }}
+      checklistItems={checklistForTask(task)}
+      checklistOpen={openChecklistTaskIds.has(taskRecordId(task))}
+      onChecklistOpen={toggleChecklist}
+      onChecklistAdd={addChecklistItem}
+      onChecklistUpdate={updateChecklistItem}
+      onChecklistDelete={deleteChecklistItem}
+    />
+  );
   return (
     <div className="work-page">
       <div className="task-2l">
@@ -1307,15 +1249,15 @@ export function TaskWorkspace({
           <h1>업무</h1>
           <div className="segmented task-filters">
             {([
-              ["today", "오늘"],
               ["all", "전체"],
               ["requested", "요청받은 업무"],
               ["recurring", "반복 업무"],
             ] as const).map(([value, label]) => (
               <button
                 key={value}
-                className={value === "all" ? (!filters.length ? "selected" : "") : filters.includes(value) ? "selected" : ""}
-                onClick={() => value === "all" ? resetFilters() : toggleFilter(value)}
+                className={sourceFilter === value ? "selected" : ""}
+                aria-pressed={sourceFilter === value}
+                onClick={() => setSourceFilter(value)}
               >
                 {label}
               </button>
@@ -1330,7 +1272,7 @@ export function TaskWorkspace({
           <button aria-label="이전 달" onClick={() => moveCalendarMonth(-1)}>‹</button>
           <input aria-label="업무 캘린더 월" type="month" value={month} onChange={(event) => event.target.value && setCalendarMonth(event.target.value)} />
           <button aria-label="다음 달" onClick={() => moveCalendarMonth(1)}>›</button>
-          <button onClick={() => setCalendarMonth(today.slice(0, 7))}>오늘</button>
+          <button onClick={() => { setCalendarMonth(today.slice(0, 7)); showTodayBoard(); }}>오늘</button>
           <span className="task-clock">한국 {koreanClock(serverNow)}</span>
           <button onClick={() => setProjectEditor(null)}>＋ 프로젝트</button>
           <button className="primary" onClick={() => { setNewTaskProjectId(""); setNewTaskDate(today); setNewTaskParentId(""); setNewTaskTitle(""); setTaskEditor(null); }}>＋ 업무</button>
@@ -1340,11 +1282,11 @@ export function TaskWorkspace({
         <main className="work-main">
           <div className="work-overview-grid">
             <section className="task-calendar calendar-main panel">
-              <div className="section-toolbar"><h2>{month.replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 선택 · 업무 추가 · 휠로 월 전환</small></div>
+              <div className="section-toolbar"><h2>{month.replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 선택 · 업무 추가 · Shift+휠로 월 전환</small></div>
               <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
-              <div className="calendar-grid" onWheel={handleCalendarWheel}>
-                {calendarWeeks.map(({ week, bars, laneCount }, weekIndex) => (
-                  <div className="calendar-week" key={`week-${weekIndex}`} style={{ minHeight: `${Math.max(66, 20 + laneCount * 19)}px` }}>
+              <div className="calendar-grid" ref={calendarGridRef} onWheel={handleCalendarWheel}>
+                {calendarWeeks.map(({ week, bars, hidden, overflowLane }, weekIndex) => (
+                  <div className="calendar-week" key={`week-${weekIndex}`}>
                     <div className="calendar-days">
                       {week.map((day, index) => <div className={`${day ? "calendar-day" : "calendar-day calendar-day-outside"}${day === today ? " today" : ""}${day === selectedDate ? " selected" : ""}${day && dragOverDate === day ? " drag-over" : ""}`} key={day ?? `outside-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)} onDragOver={(event) => { if (day && draggedTaskId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDragOverDate(day); } }} onDragLeave={() => day && dragOverDate === day && setDragOverDate(null)} onDrop={(event) => { if (!day) return; event.preventDefault(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; if (taskId) moveTaskToDate(taskId, day); }}>
                         {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>
@@ -1363,8 +1305,8 @@ export function TaskWorkspace({
                           className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}${bar.kind === "event" ? " calendar-event-bar" : ""}${bar.kind === "task" && bar.task.status === "done" ? " done" : ""}`}
                           key={`${bar.kind}:${bar.kind === "project" ? bar.project.id : bar.kind === "event" ? bar.event.id : bar.task.id}:${weekIndex}`}
                           draggable={draggable}
-                          style={{ left: `${((bar.startColumn - 1) / 7) * 100}%`, width: `calc(${((bar.endColumn - bar.startColumn) / 7) * 100}% - 4px)`, top: `${20 + bar.lane * 19}px`, backgroundColor: color, color: readableOnColor(color) }}
-                          title={`${bar.label}${project ? ` · ${project.name}` : event ? ` · ${event.location ?? "이벤트"}` : ""}`}
+                          style={{ left: `${((bar.startColumn - 1) / 7) * 100}%`, width: `calc(${((bar.endColumn - bar.startColumn) / 7) * 100}% - 4px)`, top: `${CALENDAR_DAY_HEADER + bar.lane * CALENDAR_LANE_HEIGHT}px`, backgroundColor: color, color: readableOnColor(color) }}
+                          title={`${bar.label}${project ? ` · ${project.name}${project.deleted_at ? " (휴지통)" : ""}` : event ? ` · ${event.location ?? "이벤트"}` : ""}`}
                           onDragStart={(dragEvent) => { if (!draggable || !task) return; dragEvent.dataTransfer.effectAllowed = "move"; dragEvent.dataTransfer.setData("text/plain", task.id); setDraggedTaskId(task.id); }}
                           onDragEnd={() => { setDraggedTaskId(null); setDragOverDate(null); }}
                           onClick={(clickEvent) => { clickEvent.stopPropagation(); if (task) setTaskEditor(task); else if (project) setProjectEditor(project); else if (event) onEditEvent(event); }}
@@ -1372,22 +1314,48 @@ export function TaskWorkspace({
                           {bar.label}
                         </button>;
                       })}
+                      {hidden.map((count, column) => {
+                        const day = week[column];
+                        return count > 0 && day ? <button
+                          className="calendar-more-bar"
+                          key={`more:${day}`}
+                          style={{ left: `${(column / 7) * 100}%`, width: `calc(${100 / 7}% - 4px)`, top: `${CALENDAR_DAY_HEADER + overflowLane * CALENDAR_LANE_HEIGHT}px` }}
+                          aria-label={`${day} 일정 ${count}개 더 보기`}
+                          onClick={(clickEvent) => { clickEvent.stopPropagation(); selectCalendarDate(day); }}
+                        >
+                          +{count}개
+                        </button> : null;
+                      })}
                     </div>
                   </div>
                 ))}
               </div>
             </section>
             <section className="task-list task-tree panel">
-              <div className="section-toolbar">
-                <div>
-                  <h2>{selectedDate.slice(5).replace("-", "/")} 업무 목록</h2>
-                  <small>선택일 업무 {dailyTasks.length}건 · 이벤트 {dailyEvents.length}건 · 카드 중앙에 놓으면 하위 업무</small>
+              {panelMode === "today" ? (
+                <div className="section-toolbar">
+                  <div>
+                    <h2>오늘 보드 · {today.slice(5).replace("-", "/")}</h2>
+                    <small>기한 초과 {board.overdue.length} · 오늘 {board.today.length} · 반복 {board.recurring.length} · 날짜 미정 {board.undated.length}</small>
+                  </div>
+                  <div className="inline-tools">
+                    <button onClick={() => openTaskForDate(today)}>＋ 업무</button>
+                    <button onClick={() => onEditEvent(null, today)}>＋ 이벤트</button>
+                  </div>
                 </div>
-                <div className="inline-tools">
-                  <button onClick={() => openTaskForDate(selectedDate)}>＋ 업무</button>
-                  <button onClick={() => onEditEvent(null, selectedDate)}>＋ 이벤트</button>
+              ) : (
+                <div className="section-toolbar">
+                  <div>
+                    <button className="task-board-back" onClick={showTodayBoard}>← 오늘 보드</button>
+                    <h2>{selectedDate.slice(5).replace("-", "/")} 업무 목록</h2>
+                    <small>업무 {dailyTasks.length}건 · 이벤트 {dailyEvents.length}건 · 카드 오른쪽에 놓으면 하위 업무</small>
+                  </div>
+                  <div className="inline-tools">
+                    <button onClick={() => openTaskForDate(selectedDate)}>＋ 업무</button>
+                    <button onClick={() => onEditEvent(null, selectedDate)}>＋ 이벤트</button>
+                  </div>
                 </div>
-              </div>
+              )}
               {dailyEvents.map((event) => (
                 <div className="task-event-row" key={event.id}>
                   <span className="task-event-dot" aria-hidden="true" />
@@ -1398,42 +1366,29 @@ export function TaskWorkspace({
                   <button aria-label={`${event.title} 이벤트 수정`} onClick={() => onEditEvent(event)}>⋯</button>
                 </div>
               ))}
-              {dailyTaskCards.map(({ task, depth }) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  data={data}
-                  today={today}
-                  serverNow={serverNow}
-                  depth={depth}
-                  dragging={draggedListTaskId === taskRecordId(task)}
-                  dropPosition={listDropTarget?.id === taskRecordId(task) ? listDropTarget.position : null}
-                  onToggle={toggle}
-                  onEdit={(item) => setTaskEditor(item)}
-                  onDragStart={startTaskCardDrag}
-                  onDragOver={(event, target) => {
-                    if (!draggedListTaskId || draggedListTaskId === taskRecordId(target)) return;
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                    setListDropTarget({ id: taskRecordId(target), position: cardDropPosition(event) });
-                  }}
-                  onDragLeave={() => {
-                    if (listDropTarget?.id === taskRecordId(task)) setListDropTarget(null);
-                  }}
-                  onDrop={dropTaskCard}
-                  onDragEnd={() => {
-                    setDraggedListTaskId(null);
-                    setListDropTarget(null);
-                  }}
-                  checklistItems={checklistForTask(task)}
-                  checklistOpen={openChecklistTaskIds.has(taskRecordId(task))}
-                  onChecklistOpen={toggleChecklist}
-                  onChecklistAdd={addChecklistItem}
-                  onChecklistUpdate={updateChecklistItem}
-                  onChecklistDelete={deleteChecklistItem}
-                />
-              ))}
-              {!dailyTasks.length && !dailyEvents.length && <div className="empty-small">이 날짜에 예정된 업무나 이벤트가 없습니다.</div>}
+              {panelMode === "today" ? (
+                <>
+                  {([
+                    ["overdue", "기한 초과", board.overdue],
+                    ["today", "오늘", board.today],
+                    ["recurring", "반복 업무", board.recurring],
+                    ["undated", "날짜 미정", board.undated],
+                  ] as const).map(([key, label, tasks]) => tasks.length > 0 && (
+                    <div className={`task-board-section task-board-${key}`} key={key}>
+                      <h3>{label}<span>{tasks.length}</span></h3>
+                      {tasks.map((task) => renderTaskRow(task, 0, false))}
+                    </div>
+                  ))}
+                  {!board.overdue.length && !board.today.length && !board.recurring.length && !board.undated.length && !dailyEvents.length && (
+                    <div className="empty-small">오늘 할 업무가 없습니다. 캘린더에서 날짜를 눌러 다른 날의 업무를 볼 수 있습니다.</div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {dailyTaskCards.map(({ task, depth }) => renderTaskRow(task, depth, true))}
+                  {!dailyTasks.length && !dailyEvents.length && <div className="empty-small">이 날짜에 예정된 업무나 이벤트가 없습니다.</div>}
+                </>
+              )}
             </section>
           </div>
         </main>

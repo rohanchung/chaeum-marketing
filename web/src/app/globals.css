@@ -2862,12 +2862,6 @@ textarea {
   color: #557d63 !important;
   font-size: 9px !important;
 }
-.calendar-main .calendar-grid {
-  height: calc(100dvh - 166px);
-  min-height: 500px;
-  overflow: hidden;
-  flex: 1 1 auto;
-}
 .work-filters {
   display: flex;
   align-items: center;
@@ -2901,16 +2895,6 @@ textarea {
   color: var(--muted);
   font-size: 9px;
   white-space: nowrap;
-}
-.calendar-week {
-  position: relative;
-  flex: 1 1 0;
-  min-height: 0;
-}
-.calendar-main .calendar-grid {
-  display: flex;
-  flex-direction: column;
-  grid-template-columns: none;
 }
 .calendar-days,
 .calendar-week-bars {
@@ -3240,10 +3224,6 @@ textarea {
     width: 100%;
     overflow-x: auto;
   }
-  .calendar-main .calendar-grid {
-    height: 520px;
-    min-height: 360px;
-  }
   .work-filters {
     align-items: flex-start;
     flex-direction: column;
@@ -3257,9 +3237,6 @@ textarea {
   .task-2l-tools {
     justify-content: flex-start;
   }
-  .calendar-main .calendar-grid {
-    height: calc(100dvh - 210px);
-  }
 }
 
 @media (max-width: 960px) {
@@ -3272,9 +3249,6 @@ textarea {
   .task-tree {
     height: auto;
     max-height: 420px;
-  }
-  .calendar-main .calendar-grid {
-    height: 560px;
   }
 }
 
@@ -3861,9 +3835,6 @@ textarea {
 .task-tree .section-toolbar h2 {
   font-size: 13px;
 }
-.calendar-main .calendar-grid {
-  height: calc(100dvh - 190px);
-}
 .calendar-weekdays {
   margin-bottom: 0;
   border-bottom: 1px solid #e4ece5;
@@ -4019,9 +3990,6 @@ textarea {
     grid-template-columns: 1fr;
     height: auto;
   }
-  .calendar-main .calendar-grid {
-    height: 580px;
-  }
 }
 
 /* The task workspace fills the viewport. Calendar rows share the remaining
@@ -4051,9 +4019,199 @@ textarea {
   .task-page .task-tree {
     min-height: 0;
   }
-  .task-page .calendar-main .calendar-grid {
-    height: auto;
-    min-height: 0;
-    overflow-y: auto;
+}
+
+/* Task calendar grid: the single source of truth for its size (2026-09-29).
+   Week rows always share the height equally; bars that do not fit collapse
+   into "+N개" labels computed from the measured row height. */
+.calendar-main .calendar-grid {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.calendar-week {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.calendar-week-bars .calendar-task-bar,
+.calendar-week-bars .calendar-more-bar {
+  height: 19px;
+  font-size: 11px;
+  line-height: 15px;
+}
+.calendar-week-bars .calendar-more-bar {
+  position: absolute;
+  margin: 0 2px;
+  padding: 1px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #3f6a50;
+  font-weight: 700;
+  text-align: left;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.calendar-week-bars .calendar-more-bar:hover {
+  background: #e7f2ea;
+}
+.calendar-main .section-toolbar small,
+.work-page .task-sync-status,
+.work-page .task-clock {
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .calendar-main .calendar-grid {
+    flex: none;
+    height: 560px;
   }
+}
+
+/* Task side panel: today board, compact cards, readable minimum text (2026-09-29). */
+.task-tree .section-toolbar small,
+.task-tree .task-row.task-card .task-row-main small,
+.task-tree .task-row-dates,
+.task-tree .task-dependency,
+.task-tree .task-project-label,
+.task-tree .task-event-row small,
+.task-tree .task-checklist-item,
+.task-tree .task-checklist-create input,
+.task-tree .task-checklist-create button,
+.task-tree .inline-tools button,
+.task-tree .task-status,
+.task-tree .task-due {
+  font-size: 11px !important;
+}
+.task-board-back {
+  margin: 0 0 4px;
+  padding: 2px 7px;
+  border: 1px solid #d5e3d8;
+  border-radius: 5px;
+  background: #fff;
+  color: #3f6a50;
+  font-size: 11px;
+  font-weight: 650;
+}
+.task-board-section {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+.task-board-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  color: #3f5a49;
+  font-size: 12px;
+  font-weight: 750;
+}
+.task-board-section h3 span {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #e8f1ea;
+  color: #3f6a50;
+  font-size: 11px;
+  text-align: center;
+}
+.task-board-overdue h3 { color: #b04a3c; }
+.task-board-overdue h3 span { background: #fbe9e6; color: #b04a3c; }
+.task-result-label {
+  color: #4c6355 !important;
+}
+.task-result-prompt {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 4px;
+  margin-top: 6px;
+}
+.task-result-prompt input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 7px;
+  border: 1px solid #cfe0d3;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.task-result-prompt button {
+  padding: 3px 8px;
+  border: 1px solid #d5e3d8;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 11px;
+}
+.task-result-prompt button[type="submit"] {
+  border-color: #2f6f4b;
+  background: #2f6f4b;
+  color: #fff;
+}
+.task-result-prompt button:disabled {
+  opacity: .5;
+}
+.task-tree .task-row.task-card.drop-child::after {
+  content: "하위 업무로";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #4f9b70;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Operating sheet: quieter rows and one-line monthly summary (2026-09-29). */
+.row-label .row-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  margin-left: auto;
+  visibility: hidden;
+}
+.row-label .row-actions .row-add,
+.row-label .row-actions .metric-actions {
+  margin-left: 0;
+}
+.operating-sheet tr:hover .row-label .row-actions,
+.operating-sheet tr:focus-within .row-label .row-actions {
+  visibility: visible;
+}
+@media (hover: none) {
+  .row-label .row-actions {
+    visibility: visible;
+  }
+}
+.quick-menu-heading {
+  display: block;
+  padding: 2px 4px 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.rollup-summary {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+.rollup-summary select {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  overflow: hidden;
+  color: #5f7a68;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rollup-summary span {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-weight: 700;
+  white-space: nowrap;
 }
