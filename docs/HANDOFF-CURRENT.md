@@ -6,7 +6,7 @@
 
 - **단계별 계획:** [UI/UX 단계별 업데이트 계획](plan-20260929-uiux-update-roadmap.md). 0~4단계를 09-29에 구현했고 5단계(구조 분리)는 남았다.
 - **데이터 무결성:** [0단계](update-20260929-data-integrity-fixes.md). 반복 업무 회차는 반복 시작일부터 계산하고, 완료·미완료 회차를 모두 표시한다. `recurrence_next_on`은 “가장 이른 미완료 회차”다. 회차 완료는 RPC `mkt_set_task_occurrence` 한 번으로 저장한다.
-- **업무 캘린더:** [1단계](update-20260929-task-calendar-overflow.md). 주 행은 같은 높이, 넘치는 일정은 `+N개`. 월 전환은 `Shift + 휠`. 캘린더 크기 CSS는 `globals.css` 맨 아래 블록 하나만 수정한다.
+- **업무 캘린더:** [1단계](update-20260929-task-calendar-overflow.md). 주 높이는 일정 수에 따라 2~10줄로 늘고, 그 이상은 `+N개`. 캘린더 제목줄 없이 요일줄이 헤더 아래에 붙는다. 월 전환은 `Shift + 휠`. 캘린더 크기 CSS는 `globals.css` 맨 아래 블록 하나만 수정한다.
 - **오늘 보드·업무 카드:** [2·3단계](update-20260929-task-today-board.md). 오른쪽 패널 기본은 오늘 보드(기한 초과/오늘/반복/날짜 미정). 날짜 없는 업무를 다시 허용한다.
 - **대시보드:** [4단계](update-20260929-sheet-quiet-rows.md). 행 도구는 호버·포커스 때만 표시, 삭제한 지표 복원은 `⋯` 메뉴.
 

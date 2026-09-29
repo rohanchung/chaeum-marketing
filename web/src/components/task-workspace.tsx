@@ -23,8 +23,8 @@ import {
   CALENDAR_LANE_HEIGHT,
   assignLanes,
   hiddenBarsByColumn,
-  laneCapacity,
   visibleLaneCount,
+  weekRowHeight,
   weekSegment,
 } from "@/lib/task-calendar";
 
@@ -42,6 +42,12 @@ const statusLabels: Record<TaskStatus, string> = {
   waiting: "대기",
   on_hold: "보류",
   done: "완료",
+  cancelled: "취소",
+};
+const eventStatusLabels: Record<string, string> = {
+  planned: "예정",
+  active: "진행 중",
+  completed: "완료",
   cancelled: "취소",
 };
 const priorityLabels: Record<TaskPriority, string> = {
@@ -897,15 +903,6 @@ export function TaskWorkspace({
   const [listDropTarget, setListDropTarget] = useState<CardDropTarget | null>(null);
   const [openChecklistTaskIds, setOpenChecklistTaskIds] = useState<Set<string>>(new Set());
   const calendarWheelLocked = useRef(false);
-  const calendarGridRef = useRef<HTMLDivElement>(null);
-  const [calendarGridHeight, setCalendarGridHeight] = useState(0);
-  useEffect(() => {
-    const grid = calendarGridRef.current;
-    if (!grid) return;
-    const observer = new ResizeObserver(([entry]) => setCalendarGridHeight(entry.contentRect.height));
-    observer.observe(grid);
-    return () => observer.disconnect();
-  }, []);
   const materialized = useMemo(
     () => materializedTasks(data, today, monthPeriod(month)),
     [data, today, month],
@@ -995,7 +992,6 @@ export function TaskWorkspace({
     }
   }
   const activeEvents = events.filter((event) => !event.deleted_at);
-  const laneLimit = laneCapacity(calendarGridHeight / Math.max(1, calendarCells.length / 7));
   const calendarWeeks = Array.from({ length: calendarCells.length / 7 }, (_, weekIndex) => {
     const week = calendarCells.slice(weekIndex * 7, weekIndex * 7 + 7);
     const projectBars = !showProjects ? [] : data.workProjects
@@ -1039,12 +1035,13 @@ export function TaskWorkspace({
         a.endColumn - b.endColumn,
       ),
     );
-    const visibleLanes = visibleLaneCount(laneCount, laneLimit);
+    const visibleLanes = visibleLaneCount(laneCount);
     return {
       week,
       bars: bars.filter((bar) => bar.lane < visibleLanes),
       hidden: hiddenBarsByColumn(bars, visibleLanes),
       overflowLane: visibleLanes,
+      rowHeight: weekRowHeight(visibleLanes, laneCount > visibleLanes),
     };
   });
   const dailyTasks = (calendarTasks.get(selectedDate) ?? []).filter(
@@ -1205,6 +1202,13 @@ export function TaskWorkspace({
     setDraggedListTaskId(null);
     setListDropTarget(null);
   };
+  // Event completion is only toggled here on the task page; the event editor
+  // keeps the full status choice.
+  const toggleEvent = (event: MarketingEvent) => {
+    onUpdate("events", event.id, {
+      status: event.status === "completed" ? "planned" : "completed",
+    });
+  };
   const renderTaskRow = (task: Task, depth: number, reorderable: boolean) => (
     <TaskRow
       key={task.id}
@@ -1282,11 +1286,11 @@ export function TaskWorkspace({
         <main className="work-main">
           <div className="work-overview-grid">
             <section className="task-calendar calendar-main panel">
-              <div className="section-toolbar"><h2>{month.replace("-", "년 ")}월 업무 캘린더</h2><small>날짜 선택 · 업무 추가 · Shift+휠로 월 전환</small></div>
+              <h2 className="visually-hidden">{month.replace("-", "년 ")}월 업무 캘린더</h2>
               <div className="calendar-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <b key={day}>{day}</b>)}</div>
-              <div className="calendar-grid" ref={calendarGridRef} onWheel={handleCalendarWheel}>
-                {calendarWeeks.map(({ week, bars, hidden, overflowLane }, weekIndex) => (
-                  <div className="calendar-week" key={`week-${weekIndex}`}>
+              <div className="calendar-grid" title="날짜 선택 · ＋로 업무 추가 · Shift+휠로 월 전환" onWheel={handleCalendarWheel}>
+                {calendarWeeks.map(({ week, bars, hidden, overflowLane, rowHeight }, weekIndex) => (
+                  <div className="calendar-week" key={`week-${weekIndex}`} style={{ flex: `1 0 ${rowHeight}px`, minHeight: `${rowHeight}px` }}>
                     <div className="calendar-days">
                       {week.map((day, index) => <div className={`${day ? "calendar-day" : "calendar-day calendar-day-outside"}${day === today ? " today" : ""}${day === selectedDate ? " selected" : ""}${day && dragOverDate === day ? " drag-over" : ""}`} key={day ?? `outside-${weekIndex}-${index}`} onClick={() => day && selectCalendarDate(day)} onDragOver={(event) => { if (day && draggedTaskId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDragOverDate(day); } }} onDragLeave={() => day && dragOverDate === day && setDragOverDate(null)} onDrop={(event) => { if (!day) return; event.preventDefault(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; if (taskId) moveTaskToDate(taskId, day); }}>
                         {day && <button className="calendar-day-add" aria-label={`${day} 업무 추가`} onClick={(event) => { event.stopPropagation(); openTaskForDate(day); }}>
@@ -1302,7 +1306,7 @@ export function TaskWorkspace({
                         const color = event ? "#8b68b6" : projectColor(project);
                         const draggable = bar.kind === "task" && !bar.task.recurrence_template_id;
                         return <button
-                          className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}${bar.kind === "event" ? " calendar-event-bar" : ""}${bar.kind === "task" && bar.task.status === "done" ? " done" : ""}`}
+                          className={`calendar-task-bar${bar.kind === "project" ? " calendar-project-bar" : ""}${bar.kind === "event" ? " calendar-event-bar" : ""}${(bar.kind === "task" && bar.task.status === "done") || (bar.kind === "event" && bar.event.status === "completed") ? " done" : ""}`}
                           key={`${bar.kind}:${bar.kind === "project" ? bar.project.id : bar.kind === "event" ? bar.event.id : bar.task.id}:${weekIndex}`}
                           draggable={draggable}
                           style={{ left: `${((bar.startColumn - 1) / 7) * 100}%`, width: `calc(${((bar.endColumn - bar.startColumn) / 7) * 100}% - 4px)`, top: `${CALENDAR_DAY_HEADER + bar.lane * CALENDAR_LANE_HEIGHT}px`, backgroundColor: color, color: readableOnColor(color) }}
@@ -1357,11 +1361,17 @@ export function TaskWorkspace({
                 </div>
               )}
               {dailyEvents.map((event) => (
-                <div className="task-event-row" key={event.id}>
-                  <span className="task-event-dot" aria-hidden="true" />
+                <div className={`task-event-row${event.status === "completed" ? " done" : ""}`} key={event.id}>
+                  <input
+                    type="checkbox"
+                    className="task-event-check"
+                    checked={event.status === "completed"}
+                    aria-label={`${event.title} 이벤트 완료`}
+                    onChange={() => toggleEvent(event)}
+                  />
                   <div>
                     <strong>{event.title}</strong>
-                    <small>이벤트 · {event.location || "장소 미입력"} · {event.status}</small>
+                    <small>이벤트 · {event.location || "장소 미입력"} · {eventStatusLabels[event.status] ?? event.status}</small>
                   </div>
                   <button aria-label={`${event.title} 이벤트 수정`} onClick={() => onEditEvent(event)}>⋯</button>
                 </div>

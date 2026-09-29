@@ -6,6 +6,10 @@ export type BarSpan = { startColumn: number; endColumn: number };
 /** Height of the date label row and of one bar lane, in pixels. */
 export const CALENDAR_DAY_HEADER = 22;
 export const CALENDAR_LANE_HEIGHT = 21;
+/** A quiet week reserves this many lanes; a busy week grows up to the maximum. */
+export const CALENDAR_MIN_LANES = 2;
+export const CALENDAR_MAX_LANES = 10;
+const CALENDAR_WEEK_BOTTOM = 4;
 
 /**
  * Columns (1-based, end exclusive) that a date range covers inside one week,
@@ -44,17 +48,18 @@ export function assignLanes<T extends BarSpan>(bars: T[]) {
   return { bars: positioned, laneCount: lanes.length };
 }
 
-/** How many bar lanes fit in a week row of the given height. */
-export function laneCapacity(rowHeight: number) {
-  return Math.max(1, Math.floor((rowHeight - CALENDAR_DAY_HEADER) / CALENDAR_LANE_HEIGHT));
+/** Lanes drawn for a week: every lane up to the maximum; the rest become "+N". */
+export function visibleLaneCount(laneCount: number, maxLanes = CALENDAR_MAX_LANES) {
+  return Math.min(laneCount, maxLanes);
 }
 
 /**
- * Lanes to draw when only `capacity` lanes fit. When bars overflow, the last
- * lane is kept for the "+N" overflow labels.
+ * Minimum height of a week row: quiet weeks stay small and busy weeks grow to
+ * fit their drawn lanes plus one line for "+N" labels when bars overflow.
  */
-export function visibleLaneCount(laneCount: number, capacity: number) {
-  return laneCount <= capacity ? laneCount : Math.max(0, capacity - 1);
+export function weekRowHeight(visibleLanes: number, overflowing: boolean) {
+  const lanes = Math.max(CALENDAR_MIN_LANES, visibleLanes + (overflowing ? 1 : 0));
+  return CALENDAR_DAY_HEADER + lanes * CALENDAR_LANE_HEIGHT + CALENDAR_WEEK_BOTTOM;
 }
 
 /** Number of hidden bars per weekday column (index 0 = Sunday). */

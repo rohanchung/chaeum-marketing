@@ -4022,20 +4022,53 @@ textarea {
 }
 
 /* Task calendar grid: the single source of truth for its size (2026-09-29).
-   Week rows always share the height equally; bars that do not fit collapse
-   into "+N개" labels computed from the measured row height. */
+   Each week gets the height its bars need (up to 10 lanes, then "+N개"; set
+   inline from lib/task-calendar.ts), and spare height is shared by all weeks.
+   When busy weeks exceed the screen, the grid scrolls with the plain wheel;
+   Shift + wheel changes the month. */
 .calendar-main .calendar-grid {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .calendar-week {
   position: relative;
-  flex: 1 1 0;
-  min-height: 0;
   overflow: hidden;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* Compact header: the weekday row sits directly under the task header. */
+.workspace.task-page {
+  padding-top: 6px;
+}
+.work-page .task-2l {
+  min-height: 36px;
+  margin-bottom: 4px;
+  padding: 0 0 4px;
+}
+.work-page .task-2l h1 {
+  font-size: 18px;
+}
+.work-page .task-calendar.panel {
+  padding: 0;
+  overflow: hidden;
+}
+.work-page .task-calendar .calendar-weekdays {
+  border-bottom: 1px solid #e4ece5;
+  background: #f7faf7;
+}
+.work-page .task-calendar .calendar-weekdays b {
+  padding: 4px 2px;
+  font-size: 11px;
 }
 .calendar-week-bars .calendar-task-bar,
 .calendar-week-bars .calendar-more-bar {
@@ -4214,4 +4247,20 @@ textarea {
   margin-left: auto;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* Event completion check on the task page (2026-09-29). */
+.task-tree .task-event-row {
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+}
+.task-event-check {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #8b68b6;
+  cursor: pointer;
+}
+.task-event-row.done strong {
+  color: var(--muted);
+  text-decoration: line-through;
 }

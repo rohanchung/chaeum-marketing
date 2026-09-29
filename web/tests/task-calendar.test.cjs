@@ -17,8 +17,8 @@ require.extensions[".ts"] = (module, file) =>
 const {
   assignLanes,
   hiddenBarsByColumn,
-  laneCapacity,
   visibleLaneCount,
+  weekRowHeight,
   weekSegment,
 } = require("../src/lib/task-calendar.ts");
 
@@ -42,17 +42,20 @@ test("bars share a lane only when their columns do not overlap", () => {
   assert.equal(laneCount, 2);
 });
 
-test("lane capacity follows the measured row height", () => {
-  assert.equal(laneCapacity(0), 1);
-  assert.equal(laneCapacity(81), 2);
-  assert.equal(laneCapacity(113), 4);
-});
-
-test("overflowing weeks keep the last lane for +N labels", () => {
-  assert.equal(visibleLaneCount(3, 4), 3);
-  assert.equal(visibleLaneCount(9, 4), 3);
-  assert.equal(visibleLaneCount(9, 1), 0);
+test("weeks show up to ten lanes before collapsing into +N", () => {
+  assert.equal(visibleLaneCount(3), 3);
+  assert.equal(visibleLaneCount(10), 10);
+  assert.equal(visibleLaneCount(14), 10);
   const { bars } = assignLanes(Array.from({ length: 5 }, () => ({ startColumn: 2, endColumn: 3 })));
   bars.push({ startColumn: 2, endColumn: 5, lane: 5 });
   assert.deepEqual(hiddenBarsByColumn(bars, 3), [0, 3, 1, 1, 0, 0, 0]);
+});
+
+test("quiet weeks keep a small base height and busy weeks grow", () => {
+  // 22px date row + lanes * 21px + 4px bottom.
+  assert.equal(weekRowHeight(0, false), 22 + 2 * 21 + 4);
+  assert.equal(weekRowHeight(1, false), 22 + 2 * 21 + 4);
+  assert.equal(weekRowHeight(7, false), 22 + 7 * 21 + 4);
+  // Ten drawn lanes plus one line for the +N labels.
+  assert.equal(weekRowHeight(10, true), 22 + 11 * 21 + 4);
 });
