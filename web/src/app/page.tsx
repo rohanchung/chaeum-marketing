@@ -30,6 +30,7 @@ import {
   timestamp,
   isBusinessProfile,
   eventStatusLabels,
+  costPurposeLabels,
 } from "@/lib/domain";
 import { report, sourceName } from "@/lib/analytics";
 import {
@@ -67,6 +68,7 @@ import { BrandMark, DataTable, Empty, PageTitle } from "@/components/ui";
 import { AppHeader, PeriodRange } from "@/components/app-header";
 import { Kpis } from "@/components/kpis";
 import { Analysis } from "@/components/analysis";
+import { LtvPanel } from "@/components/ltv-panel";
 import { firstOpenOccurrence } from "@/lib/task-recurrence";
 import { compareEvents, eventInPeriod, eventOnDate, toggledEventStatus } from "@/lib/events";
 
@@ -973,7 +975,7 @@ export default function Home() {
                 />
                 <div className="section-toolbar">
                   <div className="segmented">
-                    {["성과", "비용", "고객", "결제"].map((t) => (
+                    {["성과", "장기", "비용", "고객", "결제"].map((t) => (
                       <button
                         key={t}
                         className={analysisTab === t ? "selected" : ""}
@@ -982,7 +984,9 @@ export default function Home() {
                           setLifecycle("active");
                         }}
                       >
-                        {t === "고객"
+                        {t === "장기"
+                          ? "장기 수익성"
+                          : t === "고객"
                           ? "고객·전환"
                           : t === "결제"
                             ? "결제·환불"
@@ -992,7 +996,7 @@ export default function Home() {
                       </button>
                     ))}
                   </div>
-                  {analysisTab !== "성과" && (
+                  {analysisTab !== "성과" && analysisTab !== "장기" && (
                     <div className="actions">
                       <label className="check">
                         <input
@@ -1024,12 +1028,21 @@ export default function Home() {
                 </div>
                 {analysisTab === "성과" ? (
                   <Analysis report={currentReport} />
+                ) : analysisTab === "장기" ? (
+                  <LtvPanel
+                    data={data}
+                    period={period}
+                    today={today}
+                    onOpenCustomers={() => setAnalysisTab("고객")}
+                    onSaveSettings={(record) => mutate("ltvSettings", record)}
+                  />
                 ) : analysisTab === "비용" ? (
                   <DataTable
                     headers={[
                       "지급일",
                       "비용 / 대상",
                       "항목",
+                      "성격",
                       "상태",
                       "금액",
                       "관리",
@@ -1045,6 +1058,7 @@ export default function Home() {
                           <small>{source(c)}</small>
                         </span>,
                         categories[c.category],
+                        costPurposeLabels[c.cost_purpose ?? "acquisition"],
                         c.payment_status === "paid"
                           ? "지급 완료"
                           : c.payment_status === "pending"
@@ -1101,6 +1115,8 @@ export default function Home() {
                         "참조번호",
                         "최초 상담",
                         "신규 등록",
+                        "월 수강료",
+                        "퇴원",
                         "주 출처",
                         "확인 근거",
                         "관리",
@@ -1116,6 +1132,8 @@ export default function Home() {
                           c.reference_code,
                           c.consulted_on,
                           c.enrolled_on ?? "—",
+                          money(c.monthly_fee ?? null),
+                          c.withdrawn_on ?? "—",
                           source(c),
                           {
                             reported: "고객 답변",
@@ -1380,6 +1398,7 @@ export default function Home() {
                             "mkt_task_checklist_items",
                             "mkt_work_links",
                             "mkt_task_occurrences",
+                            "mkt_ltv_settings",
                           ] as const) {
                             const rows = backup.tables[table];
                             if (!Array.isArray(rows) || rows.length === 0) continue;

@@ -134,12 +134,18 @@ export type Cost = Base &
     title: string;
     notes: string | null;
     grid_entry: boolean;
+    /** null (older rows, sheet ad spend) counts as acquisition. */
+    cost_purpose?: CostPurpose | null;
   };
+export type CostPurpose = "acquisition" | "launch" | "retention";
 export type Customer = Base &
   Source & {
     reference_code: string;
     consulted_on: string;
     enrolled_on: string | null;
+    /** Monthly tuition entered per student; null = not entered yet. */
+    monthly_fee?: number | null;
+    withdrawn_on?: string | null;
     confidence: "reported" | "direct" | "inferred" | "unknown";
     notes: string | null;
   };
@@ -267,6 +273,7 @@ export type Data = {
   taskChecklistItems: TaskChecklistItem[];
   workLinks: WorkLink[];
   taskOccurrences: TaskOccurrence[];
+  ltvSettings: LtvSettings[];
 };
 export const emptyData: Data = {
   channels: [],
@@ -287,6 +294,7 @@ export const emptyData: Data = {
   taskChecklistItems: [],
   workLinks: [],
   taskOccurrences: [],
+  ltvSettings: [],
 };
 export type Period = { start: string; end: string };
 export type MetricRow = {
@@ -379,6 +387,18 @@ export const modeLabels = {
   cumulative: "누적 총수 · 마지막 값",
   latest: "최근 관측값",
   ratio: "원시값 재계산",
+};
+export type LtvSettings = Base & {
+  contribution_rate: number;
+  retention_months: number;
+  ltv_cap_months: number;
+  target_ratio: number;
+  target_payback_months: number;
+};
+export const costPurposeLabels: Record<CostPurpose, string> = {
+  acquisition: "신규 획득",
+  launch: "개원·브랜딩 (1회성)",
+  retention: "재원생 유지",
 };
 export const categories: Record<string, string> = {
   media: "광고비",

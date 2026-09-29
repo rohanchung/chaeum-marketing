@@ -10,7 +10,7 @@ export function summaryRows(r: Report) {
     ["결제 고객", number(s.payers, "명")],
     ["객단가", money(s.aov)],
     ["서비스 원가", money(s.serviceCost)],
-    ["기간 마케팅 ROI", percent(s.roi)],
+    ["당월 현금 ROI", percent(s.roi)],
     ["매출 / 마케팅비", number(s.revenueToSpend, "배")],
     ["유입", number(s.inflows)],
     ["상담 건수", number(s.consultations)],

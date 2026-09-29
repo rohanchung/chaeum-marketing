@@ -9,6 +9,18 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260929-analysis-ltv",
+    date: "2026-09-29",
+    title: "분석 장기 수익성(LTV·CAC) 탭",
+    room: "현재 제작방",
+    changes: [
+      "분석에 장기 수익성 탭을 추가했습니다. 등록당 획득비, 1인 월 공헌이익, LTV, LTV:CAC, 회수 기간을 학생 한 명 기준으로 보여 줍니다.",
+      "학생 기록에 월 수강료·퇴원일 칸을, 비용 기록에 비용 성격(신규 획득·개원·재원생 유지) 칸을 추가했습니다.",
+      "등록월별 회수 표, 채널별 획득 효율, 유지 기간 시나리오와 가정값 설정(공헌이익률 40%, 기대 유지 6개월 등)을 제공합니다.",
+      "기존 기간 마케팅 ROI는 단기 지표임을 알 수 있도록 ‘당월 현금 ROI’로 이름을 바꿨습니다.",
+    ],
+  },
+  {
     id: "20260929-events-sync-and-flow",
     date: "2026-09-29",
     title: "흐름 페이지·이벤트 표시 통일·결과 메모 바로 쓰기",

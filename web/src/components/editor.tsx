@@ -10,6 +10,7 @@ import {
   scopeLabels,
   timestamp,
   categories,
+  costPurposeLabels,
 } from "@/lib/domain";
 import { Collection } from "@/lib/repository";
 import { CarrotGuide } from "./carrot-guide";
@@ -332,6 +333,7 @@ export function Editor({
           amount,
           category: get("category"),
           payment_status: get("payment_status"),
+          cost_purpose: get("cost_purpose") || "acquisition",
           grid_entry:
             !!sourceFields(source).promotion_id && get("category") === "media",
         };
@@ -345,15 +347,26 @@ export function Editor({
           value: get("value") === "" ? null : Number(get("value")),
         };
       }
-      if (collection === "customers")
+      if (collection === "customers") {
+        const fee = get("monthly_fee");
+        const monthlyFee = fee === "" ? null : Number(fee);
+        if (monthlyFee !== null && (!Number.isFinite(monthlyFee) || monthlyFee < 0))
+          throw new Error("월 수강료는 0 이상의 금액으로 입력하세요.");
+        const enrolledOn = nullable("enrolled_on");
+        const withdrawnOn = nullable("withdrawn_on");
+        if (withdrawnOn && (!enrolledOn || withdrawnOn < enrolledOn))
+          throw new Error("퇴원일은 신규 등록일 이후로 입력하세요.");
         patch = {
           ...patch,
           ...sourceFields(source),
           reference_code: get("reference_code"),
           consulted_on: get("consulted_on"),
-          enrolled_on: nullable("enrolled_on"),
+          enrolled_on: enrolledOn,
+          withdrawn_on: withdrawnOn,
+          monthly_fee: monthlyFee,
           confidence: get("confidence"),
         };
+      }
       if (collection === "payments") {
         const amount = Number(get("amount"));
         const service_cost =
@@ -921,6 +934,21 @@ export function Editor({
                   </select>
                 </Field>
               </div>
+              <Field
+                label="비용 성격"
+                hint="장기 수익성 분석의 등록당 획득비(CAC)에는 ‘신규 획득’만 들어갑니다."
+              >
+                <select
+                  name="cost_purpose"
+                  defaultValue={text("cost_purpose", "acquisition")}
+                >
+                  {Object.entries(costPurposeLabels).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
               <Field label="비용 대상">
                 <select
                   value={source}
@@ -949,6 +977,14 @@ export function Editor({
                 </Field>
                 <Field label="신규 등록일">
                   {input("enrolled_on", "date")}
+                </Field>
+              </div>
+              <div className="form-pair">
+                <Field label="월 수강료 (원)" hint="비워 두면 장기 수익성 계산에서 제외합니다.">
+                  {input("monthly_fee", "number", false, "", { min: 0, step: 1000 })}
+                </Field>
+                <Field label="퇴원일" hint="다니는 중이면 비워 둡니다.">
+                  {input("withdrawn_on", "date")}
                 </Field>
               </div>
               <Field label="주 유입 경로">

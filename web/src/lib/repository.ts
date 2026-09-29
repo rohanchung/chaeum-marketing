@@ -21,6 +21,7 @@ export const tables = {
   taskChecklistItems: "mkt_task_checklist_items",
   workLinks: "mkt_work_links",
   taskOccurrences: "mkt_task_occurrences",
+  ltvSettings: "mkt_ltv_settings",
 } as const;
 export type Collection = keyof typeof tables;
 export async function fetchRows(table: string, workspace: string) {

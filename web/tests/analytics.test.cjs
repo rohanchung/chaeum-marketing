@@ -1244,7 +1244,7 @@ test("Excel export serializes the same net receipts and preserves missing values
     assert.ok(
       rows.some(
         (r) =>
-          r[0] === "기간 마케팅 ROI" && (r[1] === undefined || r[1] === null),
+          r[0] === "당월 현금 ROI" && (r[1] === undefined || r[1] === null),
       ),
     );
   } finally {

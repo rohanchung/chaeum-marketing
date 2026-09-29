@@ -21,11 +21,11 @@ export function Kpis({
         ["순수납 매출", money(s.revenue), `결제 고객 ${number(s.payers)}명`],
         ["객단가", money(s.aov), "순수납 / 결제 고객"],
         [
-          "기간 마케팅 ROI",
+          "당월 현금 ROI",
           percent(s.roi),
           s.costMissing
             ? `서비스 원가 미입력 ${s.costMissing}건`
-            : "원가·마케팅 비용 차감",
+            : "이번 기간 수납·비용만 비교한 단기 지표",
         ],
         [
           "전체 등록당 비용",

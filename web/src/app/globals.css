@@ -4695,3 +4695,88 @@ textarea {
     height: 520px;
   }
 }
+
+/* Analysis > 장기 수익성 (2026-09-29). */
+.ltv-panel {
+  display: grid;
+  gap: 10px;
+}
+.ltv-panel > .form-note {
+  margin: 0;
+}
+.ltv-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid #f0d9a8;
+  border-radius: 8px;
+  background: #fff8ea;
+  color: #6f4a12;
+  font-size: 12px;
+}
+.ltv-callout button {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.ltv-kpis strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ltv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.ltv-panel .section-toolbar {
+  margin-bottom: 8px;
+}
+.ltv-panel .section-toolbar small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.ltv-verdict {
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ltv-verdict.good { background: #e3f3e8; color: #1f6b40; }
+.ltv-verdict.watch { background: #fff1d6; color: #8a5a0f; }
+.ltv-verdict.review { background: #fbe4e0; color: #9b3b2f; }
+.ltv-recovered {
+  color: #1f6b40;
+  font-weight: 700;
+}
+.ltv-settings summary {
+  font-size: 12px;
+  font-weight: 700;
+}
+.ltv-settings form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.ltv-settings .form-field small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.ltv-settings .flow-error,
+.ltv-settings-actions {
+  grid-column: 1 / -1;
+}
+.ltv-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+@media (max-width: 960px) {
+  .ltv-grid,
+  .ltv-settings form {
+    grid-template-columns: 1fr;
+  }
+}
