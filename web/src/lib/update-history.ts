@@ -9,6 +9,16 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20260930-direct-ad-single-group",
+    date: "2026-09-30",
+    title: "광고 소재의 운영시트 입력 묶음 통합",
+    room: "현재 제작방",
+    changes: [
+      "광고 기간이 달의 일부만 덮을 때 한 소재 아래 ‘일별 광고 기록’과 ‘광고’ 두 묶음이 생기던 문제를 고쳤습니다. 이제 광고 지표·광고비는 한 묶음입니다.",
+      "모든 날짜를 입력할 수 있고, 각 날짜는 그 날짜의 광고 기간에 저장됩니다. 월간 요약은 모든 기간을 합쳐 보여 줍니다.",
+    ],
+  },
+  {
     id: "20260929-analysis-ltv",
     date: "2026-09-29",
     title: "분석 장기 수익성(LTV·CAC) 탭",

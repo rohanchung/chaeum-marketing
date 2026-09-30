@@ -1251,3 +1251,29 @@ test("Excel export serializes the same net receipts and preserves missing values
     XLSX.writeFile = writeFile;
   }
 });
+
+test("부분 집행 기간이 있어도 광고 지표는 한 묶음이며 날짜마다 맞는 기간에 저장된다", () => {
+  const { segmentFor } = require("../src/lib/domain.ts");
+  const d = fixture();
+  d.promotions[0].start_date = "2026-09-29";
+  d.promotions[0].end_date = "2026-09-30";
+  const segmentsOf = () =>
+    sheetPromotions(d, "content", period).map((p) => ({ id: p.id, start: p.start_date, end: p.end_date }));
+  const combined = { ...row(d, "clicks", "paid"), promotion_id: null, segments: segmentsOf() };
+  // Days inside the ad period go to the ad; other days go to a sheet slot (never blocked).
+  assert.equal(segmentFor(combined, "2026-09-29"), "promo");
+  assert.equal(segmentFor(combined, "2026-09-30"), "promo");
+  assert.match(segmentFor(combined, "2026-09-10"), /^sheet:/);
+  // Values saved in the ad period and in an earlier daily record are read together.
+  d.promotions.push({ ...d.promotions[0], id: "daily", title: "2026-09 일별 광고 기록", start_date: "2026-09-01", end_date: "2026-09-28" });
+  const merged = { ...combined, segments: segmentsOf() };
+  const clicks = merged.metric.id;
+  d.values.push(
+    { ...base, id: "v1", metric_id: clicks, content_id: "content", promotion_id: "daily", metric_date: "2026-09-10", value: 5 },
+    { ...base, id: "v2", metric_id: clicks, content_id: "content", promotion_id: "promo", metric_date: "2026-09-29", value: 7 },
+  );
+  assert.equal(metricValue(d, merged, period).value, 12);
+  assert.equal(metricValue(d, merged, { start: "2026-09-29", end: "2026-09-29" }).value, 7);
+  d.costs.push({ ...base, ...source, id: "c1", promotion_id: "promo", category: "media", payment_status: "paid", expense_date: "2026-09-29", amount: 1000, grid_entry: true });
+  assert.equal(metricValue(d, { ...merged, kind: "cost", metric: null }, period).value, 1000);
+});

@@ -306,6 +306,21 @@ export type MetricRow = {
   kind: "metric" | "cost";
   start?: string;
   end?: string;
+  /**
+   * One sheet row for all of a content's ad periods in the month: each date
+   * saves into the period that covers it, and values are read across all of them.
+   */
+  segments?: Array<{ id: string; start: string; end: string }>;
+};
+/** The ad period (real or sheet slot) a date of a combined row saves into. */
+export const segmentFor = (row: MetricRow, date: string) =>
+  row.segments?.find((segment) => segment.start <= date && date <= segment.end)?.id ?? null;
+const rowPromotions = (row: MetricRow) =>
+  row.segments ? new Set(row.segments.map((segment) => segment.id)) : null;
+/** True when a stored promotion id belongs to the row. */
+export const matchesRowPromotion = (row: MetricRow, promotionId: string | null) => {
+  const ids = rowPromotions(row);
+  return ids ? promotionId !== null && ids.has(promotionId) : promotionId === row.promotion_id;
 };
 export type CellChange = {
   kind: "metric" | "cost";

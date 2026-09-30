@@ -15,6 +15,7 @@ import {
   modeLabels,
   scopeLabels,
   metricsForContent,
+  matchesRowPromotion,
 } from "./domain";
 
 const sum = (values: number[]) => values.reduce((a, b) => a + Number(b), 0);
@@ -55,7 +56,7 @@ export function metricValue(
         c.payment_status === "paid" &&
         (row.metric?.scope === "channel"
           ? sourceChannel(d, c) === row.metric.channel_id
-          : c.promotion_id === row.promotion_id) &&
+          : matchesRowPromotion(row, c.promotion_id ?? null)) &&
         c.category === "media" &&
         inPeriod(c.expense_date, p),
     );
@@ -96,7 +97,7 @@ export function metricValue(
         v.value !== null &&
         v.metric_id === metric.id &&
         v.content_id === row.content_id &&
-        v.promotion_id === row.promotion_id &&
+        matchesRowPromotion(row, v.promotion_id) &&
         inPeriod(v.metric_date, p),
     )
     .sort((a, b) => a.metric_date.localeCompare(b.metric_date));

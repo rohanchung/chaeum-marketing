@@ -19,6 +19,7 @@ import {
   isSearchKeyword,
   metricsForContent,
   compareContentCreated,
+  segmentFor,
 } from "@/lib/domain";
 import { metricValue } from "@/lib/analytics";
 import { RollupTarget, rollupOptions, rollupValue } from "@/lib/sheet-rollup";
@@ -320,6 +321,7 @@ export function OperatingSheet({
     parents: string[],
     start?: string,
     end?: string,
+    segments?: MetricRow["segments"],
   ) =>
     metrics.sort(compareMetrics).forEach((m) =>
       rows.push({
@@ -341,6 +343,7 @@ export function OperatingSheet({
           promotion_id: promotion,
           start,
           end,
+          segments,
         },
       }),
     );
@@ -479,6 +482,32 @@ export function OperatingSheet({
           },
         });
       }
+      if (directAd && promotions.length) {
+        // Direct ads (당근·인스타·검색광고) keep one row set per content. Each date
+        // saves into the ad period that covers it, or into a sheet slot for days
+        // without one, so a partial ad period never splits the content into
+        // separate groups or blocks any day.
+        const segments = promotions.map((p) => ({ id: p.id, start: p.start_date, end: p.end_date }));
+        const costLabel = ch.measurement_template === "paid_ad" ? "지출" : "광고비";
+        metricRows(ms.filter((m) => m.scope === "paid"), c.id, null, 2, [ch.id, c.id], undefined, undefined, segments);
+        rows.push({
+          id: `cost:${c.id}`,
+          label: costLabel,
+          depth: 2,
+          parentIds: [ch.id, c.id],
+          detail: "비용 원장 · 지급액",
+          metricRow: {
+            id: `combined:${c.id}`,
+            label: costLabel,
+            kind: "cost",
+            metric: null,
+            content_id: c.id,
+            promotion_id: null,
+            segments,
+          },
+        });
+        return;
+      }
       promotions.forEach((p) => {
         if (!directAd || promotions.length > 1)
           rows.push({
@@ -551,12 +580,14 @@ export function OperatingSheet({
     (r) => r.metricRow && r.metricRow.metric?.mode !== "ratio",
   );
   const allowed = (row: MetricRow, date: string) =>
-    !row.start || (date >= row.start && date <= row.end!);
+    row.segments
+      ? segmentFor(row, date) !== null
+      : !row.start || (date >= row.start && date <= row.end!);
   const change = (row: MetricRow, date: string, raw: string): CellChange => ({
     kind: row.kind,
     metric_id: row.metric?.id,
     content_id: row.content_id,
-    promotion_id: row.promotion_id,
+    promotion_id: row.segments ? segmentFor(row, date) : row.promotion_id,
     date,
     value: cellNumber(raw, row.metric),
   });
