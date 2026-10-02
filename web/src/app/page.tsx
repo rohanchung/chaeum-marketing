@@ -74,6 +74,8 @@ import { compareEvents, eventInPeriod, eventOnDate, toggledEventStatus } from "@
 
 const tabs = navigationTabs;
 const objectRecord = (value: unknown) => value as Record<string, unknown>;
+/** Longer than one request timeout (30s) so a normal slow save is still waited for. */
+const QUEUE_WAIT_LIMIT_MS = 45_000;
 const koreanClock = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -300,8 +302,13 @@ export default function Home() {
     if (!workspace) return Promise.reject(new Error("로그인이 필요합니다."));
     setBusy((b) => b + 1);
     setError("");
-    const job = queue.current
-      .catch(() => {})
+    // Saves run one at a time, but a stalled earlier save (e.g. a request that
+    // hung while the laptop slept) must never block later input forever.
+    const previous = Promise.race([
+      queue.current.catch(() => {}),
+      new Promise<void>((resolve) => setTimeout(resolve, QUEUE_WAIT_LIMIT_MS)),
+    ]);
+    const job = previous
       .then(async () => {
         changes = await resolveSheetCells(
           { ...stateRef.current, promotions: [...stateRef.current.promotions] },

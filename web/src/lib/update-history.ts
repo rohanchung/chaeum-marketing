@@ -9,6 +9,16 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20261002-save-queue-timeout",
+    date: "2026-10-02",
+    title: "운영시트 저장 멈춤 방지",
+    room: "현재 제작방",
+    changes: [
+      "응답 없는 요청 하나 때문에 이후 시트 입력이 저장되지 않고 계속 대기하던 문제를 고쳤습니다.",
+      "모든 서버 요청은 30초 안에 응답이 없으면 오류를 표시하고, 시트 저장은 다음 입력을 계속 처리합니다.",
+    ],
+  },
+  {
     id: "20260930-direct-ad-single-group",
     date: "2026-09-30",
     title: "광고 소재의 운영시트 입력 묶음 통합",
