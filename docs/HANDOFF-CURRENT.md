@@ -11,6 +11,8 @@
 - **전역 헤더·페이지 검토·구조:** [5단계](update-20260929-header-structure-review.md). 날짜 컨트롤과 저장 상태는 헤더 하나에만 둔다(페이지에 다시 만들지 않는다). 한 페이지 안에 같은 동작 버튼을 두지 않는다. 최소 글자 11px. 업무 화면 코드는 `task-form / task-row / task-shared / lib/task-*`로 나뉘어 있다.
 - **흐름·이벤트:** [흐름 페이지·이벤트 표시 통일](update-20260929-events-sync-and-flow.md). 이벤트를 보여 주는 모든 화면은 `lib/events.ts` 기준만 쓴다. 흐름은 가지치기형(앞 일 = `depends_on_task_id`)·프로젝트별이며 저장은 `saveTaskFlow` 일괄 upsert 한 번이다.
 - **장기 수익성(LTV·CAC):** [기획](plan-20260929-ltv-marketing-cost.md) · [구현](update-20260929-analysis-ltv.md). 분석 > 장기 수익성 탭. 기본값: 공헌이익률 40%, 기대 유지 6개월(로한 결정), LTV 상한 24개월, 목표 3:1·회수 3개월, 개원 비용 분리. 월 수강료는 학생 기록에 로한이 입력. 기존 기간 ROI는 `당월 현금 ROI`로 이름 변경(계산 동일).
+- **학생 명단·지표 옵션·여러 달(10-06):** [기록](update-20261006-students-and-metric-options.md). 학생 실명 저장(로한 결정). 레벨테스트·신규 등록 칸 숫자는 명단 인원(`mkt_save_funnel_students`). 지표 `aggregation_scope`(period/lifetime): 단골수·쿠폰 발급수는 lifetime. 날짜 칸은 `cellValue`(언제나 그날 값). 헤더 `여러 달`은 대시보드·콘텐츠·분석 기간에 적용, 업무는 끝 월.
+- **저장 멈춤 방지(10-02):** [기록](update-20261002-save-queue-timeout.md). 모든 Supabase 요청 30초 제한, 시트 저장 대기열 최대 45초 대기.
 - **대시보드:** [4단계](update-20260929-sheet-quiet-rows.md). 행 도구는 호버·포커스 때만 표시, 삭제한 지표 복원은 `⋯` 메뉴.
 
 ## 이전 결정 (계속 유효)

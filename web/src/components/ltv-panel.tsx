@@ -58,7 +58,7 @@ export function LtvPanel({
           <span>
             학생 기록에 <b>월 수강료</b>가 아직 없어 LTV·회수 기간을 계산하지 않았습니다. 등록 학생의 월 수강료를 입력하면 바로 계산됩니다.
           </span>
-          <button onClick={onOpenCustomers}>고객·전환 기록으로</button>
+          <button onClick={onOpenCustomers}>학생·전환 기록으로</button>
         </div>
       )}
       <div className="kpi-grid ltv-kpis">

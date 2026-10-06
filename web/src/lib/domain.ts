@@ -97,7 +97,9 @@ export type EventItem = Base & {
 };
 export type Metric = Base & {
   include_in_marketing?: boolean;
-  funnel_role?: "inflows" | "consultations" | "enrollments" | null;
+  funnel_role?: "inflows" | "consultations" | "level_tests" | "enrollments" | null;
+  /** null/"period": only the viewed period; "lifetime": from the first record through the period end. */
+  aggregation_scope?: "period" | "lifetime" | null;
   channel_id: string | null;
   key: string;
   name: string;
@@ -146,6 +148,12 @@ export type Customer = Base &
     /** Monthly tuition entered per student; null = not entered yet. */
     monthly_fee?: number | null;
     withdrawn_on?: string | null;
+    /** Student details (owner decision 2026-10-06: real names). */
+    student_name?: string | null;
+    school?: string | null;
+    grade?: string | null;
+    previous_academy?: string | null;
+    level_test_on?: string | null;
     confidence: "reported" | "direct" | "inferred" | "unknown";
     notes: string | null;
   };
@@ -398,10 +406,10 @@ export const scopeLabels = {
   paid: "광고 성과",
 };
 export const modeLabels = {
-  daily: "기간 합계 · 일별 신규 수 합산",
-  cumulative: "누적 총수 · 마지막 값",
-  latest: "최근 관측값",
-  ratio: "원시값 재계산",
+  daily: "일별 신규 수 입력 · 합산",
+  cumulative: "누적 총수 입력 · 마지막 값",
+  latest: "현재 상태값 입력 · 마지막 값",
+  ratio: "계산 지표 · 원시값으로 재계산",
 };
 export type LtvSettings = Base & {
   contribution_rate: number;

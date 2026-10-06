@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/analytics.test.cjs tests/task-recurrence.test.cjs tests/task-calendar.test.cjs tests/task-board.test.cjs tests/events.test.cjs tests/task-flow.test.cjs tests/ltv.test.cjs tests/request-timeout.test.cjs"
+    "test": "node --test tests/analytics.test.cjs tests/task-recurrence.test.cjs tests/task-calendar.test.cjs tests/task-board.test.cjs tests/events.test.cjs tests/task-flow.test.cjs tests/ltv.test.cjs tests/request-timeout.test.cjs tests/students.test.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

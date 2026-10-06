@@ -119,6 +119,25 @@ export async function deleteRecord(
     .eq("id", id);
   if (error) throw new Error(error.message);
 }
+/**
+ * Saves one funnel day's student list (레벨테스트 or 신규 등록) and sets that
+ * day's cell to the list size, in one transaction. Returns the new count.
+ */
+export async function saveFunnelStudents(
+  workspace: string,
+  metricId: string,
+  date: string,
+  students: Record<string, unknown>[],
+) {
+  const { data, error } = await supabase.rpc("mkt_save_funnel_students", {
+    p_workspace: workspace,
+    p_metric: metricId,
+    p_date: date,
+    p_students: students,
+  });
+  if (error) throw new Error(error.message);
+  return Number(data);
+}
 export async function saveCells(workspace: string, cells: CellChange[]) {
   const { error } = await supabase.rpc("mkt_save_cells", {
     p_workspace: workspace,
@@ -145,6 +164,7 @@ export async function saveMetricOrder(workspace: string, metrics: Metric[]) {
       deleted_at: m.deleted_at,
       include_in_marketing: m.include_in_marketing ?? false,
       funnel_role: m.funnel_role ?? null,
+      aggregation_scope: m.aggregation_scope ?? null,
     })),
   );
   if (error) throw new Error(error.message);

@@ -4780,3 +4780,125 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* Header month range (2026-10-06). */
+.period-range-sep {
+  color: var(--muted);
+  font-size: 12px;
+}
+.period-control .period-range-toggle {
+  color: #3f6a50;
+  font-weight: 650;
+}
+
+/* Student lists behind 레벨테스트 / 신규 등록 cells (2026-10-06). */
+.operating-sheet td .student-cell {
+  width: 100%;
+  height: 100%;
+  min-height: 24px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: #f3f8f4;
+  color: #1f5c3d;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.operating-sheet td .student-cell span {
+  color: #9ab3a2;
+  font-weight: 400;
+}
+.operating-sheet td .student-cell:hover {
+  background: #e3f0e6;
+}
+.student-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+.student-rows {
+  display: grid;
+  gap: 4px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.student-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 0.7fr 24px;
+  gap: 6px;
+  align-items: center;
+}
+.student-rows.enrolling .student-row {
+  grid-template-columns: 1.1fr 1.1fr 0.6fr 1.2fr 1fr 24px;
+}
+.student-row input {
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+.student-row-head {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+.student-remove {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9aab9f;
+}
+.student-remove:hover {
+  color: #b04a3c;
+}
+.student-actions {
+  margin: 6px 0;
+}
+.student-actions button {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.student-candidates {
+  display: grid;
+  gap: 4px;
+  max-height: 24vh;
+  margin-top: 6px;
+  padding-top: 8px;
+  overflow-y: auto;
+  border-top: 1px solid #e4ece5;
+  font-size: 12px;
+}
+.student-candidate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #f7faf7;
+}
+.student-candidate span {
+  display: grid;
+}
+.student-candidate small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.student-candidate button {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+.student-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 8px;
+  padding: 9px 12px;
+  border: 1px solid #dce6dc;
+  border-radius: 8px;
+  background: #fff;
+  color: #4c6355;
+  font-size: 12px;
+}
+.student-stats b {
+  color: #1f5c3d;
+}

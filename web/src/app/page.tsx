@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import {
   CellChange,
   Data,
+  Metric,
   Report,
   Promotion,
   Source,
@@ -46,6 +47,7 @@ import {
   saveChannelOrder,
   saveRecord,
   saveTaskFlow,
+  saveFunnelStudents,
   updateRecord,
 } from "@/lib/repository";
 import { downloadExcelReport, openPrintableReport } from "@/lib/report-export";
@@ -69,6 +71,8 @@ import { AppHeader, PeriodRange } from "@/components/app-header";
 import { Kpis } from "@/components/kpis";
 import { Analysis } from "@/components/analysis";
 import { LtvPanel } from "@/components/ltv-panel";
+import { StudentDialog } from "@/components/student-dialog";
+import { StudentRole, studentName, studentStats, tenureMonths } from "@/lib/students";
 import { firstOpenOccurrence } from "@/lib/task-recurrence";
 import { compareEvents, eventInPeriod, eventOnDate, toggledEventStatus } from "@/lib/events";
 
@@ -91,6 +95,8 @@ export default function Home() {
   const [data, setData] = useState<Data>(emptyData);
   const [nav, setNav] = useNavigation();
   const [month, setMonth] = useState(() => localDate().slice(0, 7));
+  // Optional first month of a multi-month view (may cross years); null = one month.
+  const [monthFrom, setMonthFrom] = useState<string | null>(null);
   const [day, setDay] = useState(localDate);
   const [range, setRange] = useState<PeriodRange>("month");
   const [editor, setEditor] = useState<EditorState | null>(null);
@@ -107,6 +113,7 @@ export default function Home() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [undo, setUndo] = useState<CellChange[] | null>(null);
   const [flowDirty, setFlowDirty] = useState(false);
+  const [studentDay, setStudentDay] = useState<{ metric: Metric; date: string } | null>(null);
   const queue = useRef(Promise.resolve());
   const generation = useRef(0);
   const stateRef = useRef(data);
@@ -141,17 +148,24 @@ export default function Home() {
       setDay(today);
     }
   }, [today, clockSynced]);
+  const monthRange = useMemo(
+    () => ({
+      start: `${monthFrom && monthFrom < month ? monthFrom : month}-01`,
+      end: monthPeriod(month).end,
+    }),
+    [monthFrom, month],
+  );
   const period = useMemo(
     () =>
-      nav === "대시보드" || range === "month"
-        ? monthPeriod(month)
+      nav === "대시보드" || nav === "콘텐츠" || range === "month"
+        ? monthRange
         : range === "year"
           ? {
               start: `${month.slice(0, 4)}-01-01`,
               end: `${month.slice(0, 4)}-12-31`,
             }
           : { start: day, end: day },
-    [nav, range, month, day],
+    [nav, range, month, day, monthRange],
   );
   const currentReport = useMemo(
     () => report(data, period, range === "year" && nav !== "대시보드"),
@@ -564,11 +578,15 @@ export default function Home() {
         onRange={setRange}
         month={month}
         onMonth={setMonth}
+        monthFrom={nav === "업무" ? null : monthFrom}
+        onMonthFrom={setMonthFrom}
+        allowMonthRange={nav !== "업무"}
         day={day}
         onDay={setDay}
         today={today}
         onToday={() => {
           setMonth(today.slice(0, 7));
+          setMonthFrom(null);
           setDay(today);
         }}
         busy={!!busy}
@@ -647,6 +665,7 @@ export default function Home() {
                   }
                   onDate={(date) => setEventDate(date)}
                   onDetail={setDetail}
+                  onStudents={(metric, date) => setStudentDay({ metric, date })}
                   actions={
                     <div className="inline-tools">
                       {undo && (
@@ -684,7 +703,7 @@ export default function Home() {
                           {[
                             ["contents", "소재 추가"],
                             ["costs", "비용 기록"],
-                            ["customers", "고객·전환 기록"],
+                            ["customers", "학생·전환 기록"],
                             ["payments", "결제·환불 기록"],
                             ["events", "이벤트 기록"],
                           ].map(([c, l]) => (
@@ -742,7 +761,7 @@ export default function Home() {
               <>
                 <ContentLibrary
                   data={data}
-                  month={month}
+                  period={monthRange}
                   lifecycle={lifecycle}
                   search={search}
                   onLifecycle={setLifecycle}
@@ -778,7 +797,7 @@ export default function Home() {
                           <div className="metric-list">
                             {data.metrics.filter((m) => m.channel_id === ch.id).sort((a, b) => a.sort_order - b.sort_order).map((m) => (
                               <div key={m.id}>
-                                <span><b>{m.name}</b><small>{scopeLabels[m.scope]} · {modeLabels[m.mode]}{m.deleted_at ? " · 휴지통" : ""}</small></span>
+                                <span><b>{m.name}</b><small>{scopeLabels[m.scope]} · {modeLabels[m.mode]}{m.aggregation_scope === "lifetime" ? " · 기간 무관 누적" : ""}{m.deleted_at ? " · 휴지통" : ""}</small></span>
                                 {lifecycleActions("metrics", m)}
                               </div>
                             ))}
@@ -994,7 +1013,7 @@ export default function Home() {
                         {t === "장기"
                           ? "장기 수익성"
                           : t === "고객"
-                          ? "고객·전환"
+                          ? "학생·전환"
                           : t === "결제"
                             ? "결제·환불"
                             : t === "비용"
@@ -1113,19 +1132,31 @@ export default function Home() {
                   />
                 ) : analysisTab === "고객" ? (
                   <>
+                    {(() => {
+                      const st = studentStats(data.customers, period, today);
+                      return (
+                        <div className="student-stats" role="status">
+                          <span>레벨테스트 <b>{st.levelTests}명</b></span>
+                          <span>→ 그중 등록 <b>{st.levelTestEnrolled}명</b>{st.conversion !== null ? ` (${Math.round(st.conversion * 100)}%)` : ""}</span>
+                          <span>기간 신규 등록 <b>{st.enrolledInPeriod}명</b></span>
+                          <span>재원 <b>{st.active}명</b> · 퇴원 <b>{st.withdrawn}명</b></span>
+                          <span>평균 근속 <b>{st.averageTenure === null ? "—" : `${Math.round(st.averageTenure * 10) / 10}개월`}</b></span>
+                        </div>
+                      );
+                    })()}
                     <p className="form-note">
-                      최초 상담일 또는 등록일이 기간에 포함된 고객입니다. 전체
-                      일일 집계와 별도로 관리합니다.
+                      레벨테스트·상담·등록일이 기간에 포함된 학생입니다. 대시보드의 레벨테스트·신규 등록 칸을 누르면 날짜별 명단을 기록할 수 있습니다.
                     </p>
                     <DataTable
                       headers={[
-                        "참조번호",
-                        "최초 상담",
+                        "학생",
+                        "레벨테스트",
                         "신규 등록",
+                        "이전 학원",
                         "월 수강료",
+                        "다닌 기간",
                         "퇴원",
                         "주 출처",
-                        "확인 근거",
                         "관리",
                       ]}
                       rows={data.customers
@@ -1133,35 +1164,39 @@ export default function Home() {
                           (c) =>
                             show(c) &&
                             (inPeriod(c.consulted_on, period) ||
+                              inPeriod(c.level_test_on ?? null, period) ||
                               inPeriod(c.enrolled_on, period)),
                         )
-                        .map((c) => [
-                          c.reference_code,
-                          c.consulted_on,
-                          c.enrolled_on ?? "—",
-                          money(c.monthly_fee ?? null),
-                          c.withdrawn_on ?? "—",
-                          source(c),
-                          {
-                            reported: "고객 답변",
-                            direct: "직접 확인",
-                            inferred: "추정",
-                            unknown: "미확인",
-                          }[c.confidence],
-                          <div key="actions">
-                            {lifecycleActions("customers", c)}
-                            <button
-                              onClick={() =>
-                                edit({
-                                  collection: "payments",
-                                  record: { customer_id: c.id },
-                                })
-                              }
-                            >
-                              결제 추가
-                            </button>
-                          </div>,
-                        ])}
+                        .sort((a, b) => (b.enrolled_on ?? b.level_test_on ?? b.consulted_on).localeCompare(a.enrolled_on ?? a.level_test_on ?? a.consulted_on))
+                        .map((c) => {
+                          const tenure = tenureMonths(c, today);
+                          return [
+                            <span key="student">
+                              <b>{studentName(c)}</b>
+                              <small>{[c.school, c.grade].filter(Boolean).join(" · ") || c.reference_code}</small>
+                            </span>,
+                            c.level_test_on ?? "—",
+                            c.enrolled_on ?? "—",
+                            c.previous_academy ?? "—",
+                            money(c.monthly_fee ?? null),
+                            tenure === null ? "—" : `${Math.round(tenure * 10) / 10}개월`,
+                            c.withdrawn_on ?? "—",
+                            `${source(c)} · ${{ reported: "고객 답변", direct: "직접 확인", inferred: "추정", unknown: "미확인" }[c.confidence]}`,
+                            <div key="actions">
+                              {lifecycleActions("customers", c)}
+                              <button
+                                onClick={() =>
+                                  edit({
+                                    collection: "payments",
+                                    record: { customer_id: c.id },
+                                  })
+                                }
+                              >
+                                결제 추가
+                              </button>
+                            </div>,
+                          ];
+                        })}
                     />
                   </>
                 ) : (
@@ -1435,6 +1470,23 @@ export default function Home() {
           </>
         )}
       </div>
+      {studentDay && (
+        <StudentDialog
+          data={data}
+          role={studentDay.metric.funnel_role as StudentRole}
+          date={studentDay.date}
+          metricName={studentDay.metric.name}
+          onClose={() => setStudentDay(null)}
+          onSave={(students) =>
+            run(async () => {
+              const total = await saveFunnelStudents(workspace!, studentDay.metric.id, studentDay.date, students);
+              await refresh(workspace!);
+              setLastSavedAt(serverNow);
+              setNotice(`${studentDay.metric.name} 명단을 저장했습니다. ${studentDay.date} ${total}명`);
+            })
+          }
+        />
+      )}
       {eventDate && (
         <div className="modal-backdrop">
           <section

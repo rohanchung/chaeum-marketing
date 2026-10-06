@@ -42,11 +42,17 @@ export function sourceName(d: Data, s: Source): string {
     return d.contents.find((c) => c.id === s.content_id)?.title ?? "이전 소재";
   return d.channels.find((c) => c.id === s.channel_id)?.name ?? "공용 / 미확인";
 }
+/**
+ * Value of a metric row over a period. Metrics set to `lifetime` aggregate
+ * every record from the start through the period end (e.g. total regulars),
+ * unless `periodOnly` is set — day cells always show that day's own entry.
+ */
 export function metricValue(
   d: Data,
   row: MetricRow,
   p: Period,
   depth = 0,
+  periodOnly = false,
 ): { value: number | null; observedOn: string | null } {
   if (depth > 2) return { value: null, observedOn: null };
   if (row.kind === "cost") {
@@ -69,7 +75,7 @@ export function metricValue(
   if (metric.mode === "ratio") {
     const operand = (key: string | null) =>
       key === "$spend"
-        ? metricValue(d, { ...row, kind: "cost" }, p, depth + 1).value
+        ? metricValue(d, { ...row, kind: "cost" }, p, depth + 1, periodOnly).value
         : (() => {
             const m = d.metrics.find(
               (m) =>
@@ -81,7 +87,7 @@ export function metricValue(
                 m.unit !== "rank",
             );
             return m
-              ? metricValue(d, { ...row, metric: m }, p, depth + 1).value
+              ? metricValue(d, { ...row, metric: m }, p, depth + 1, periodOnly).value
               : null;
           })();
     const n = ratio(operand(metric.numerator), operand(metric.denominator));
@@ -98,7 +104,10 @@ export function metricValue(
         v.metric_id === metric.id &&
         v.content_id === row.content_id &&
         matchesRowPromotion(row, v.promotion_id) &&
-        inPeriod(v.metric_date, p),
+        inPeriod(
+          v.metric_date,
+          !periodOnly && metric.aggregation_scope === "lifetime" ? { start: "0000-01-01", end: p.end } : p,
+        ),
     )
     .sort((a, b) => a.metric_date.localeCompare(b.metric_date));
   if (!items.length) return { value: null, observedOn: null };
@@ -111,6 +120,9 @@ export function metricValue(
     observedOn: last.metric_date,
   };
 }
+/** The entry of one day, for sheet cells (never lifetime-aggregated). */
+export const cellValue = (d: Data, row: MetricRow, date: string) =>
+  metricValue(d, row, { start: date, end: date }, 0, true);
 export function summary(
   d: Data,
   p: Period,

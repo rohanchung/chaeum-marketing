@@ -21,7 +21,8 @@ import {
   compareContentCreated,
   segmentFor,
 } from "@/lib/domain";
-import { metricValue } from "@/lib/analytics";
+import { cellValue, metricValue } from "@/lib/analytics";
+import { StudentRole, studentRoles } from "@/lib/students";
 import { RollupTarget, rollupOptions, rollupValue } from "@/lib/sheet-rollup";
 import { isEventChannel, sheetPromotions } from "@/lib/sheet-ad";
 import { EditorState } from "./editor";
@@ -162,6 +163,7 @@ export function OperatingSheet({
   onMetricDelete,
   onDate,
   onDetail,
+  onStudents,
   today,
   clockSynced,
   actions,
@@ -179,6 +181,8 @@ export function OperatingSheet({
   onMetricDelete: (id: string, deleted: boolean) => Promise<void>;
   onDate: (date: string) => void;
   onDetail: (id: string) => void;
+  /** 레벨테스트 / 신규 등록 day cells open the student list. */
+  onStudents?: (metric: Metric, date: string) => void;
   today: string;
   clockSynced: boolean;
   actions?: ReactNode;
@@ -301,6 +305,8 @@ export function OperatingSheet({
   const [error, setError] = useState("");
   const table = useRef<HTMLDivElement>(null);
   const ds = dates(period);
+  // A multi-month header range shows month markers on the first day of each month.
+  const multiMonth = period.start.slice(0, 7) !== period.end.slice(0, 7);
   useEffect(() => {
     const scroll = table.current;
     const current = scroll?.querySelector<HTMLElement>("thead [data-today]");
@@ -332,7 +338,7 @@ export function OperatingSheet({
         detail:
           m.unit === "rank"
             ? "순위 · 낮을수록 상위"
-            : `${scopeLabels[m.scope]} · ${modeLabels[m.mode]}`,
+            : `${scopeLabels[m.scope]} · ${modeLabels[m.mode]}${m.aggregation_scope === "lifetime" ? " · 기간 무관 누적" : ""}`,
         edit: { collection: "metrics", record: m },
         metricRow: {
           id: m.id,
@@ -716,7 +722,7 @@ export function OperatingSheet({
                 운영 대상 / 지표{resizeHandle("label")}
               </th>
               <th className="summary-col">
-                월간 요약{resizeHandle("summary")}
+                {multiMonth ? "기간 요약" : "월간 요약"}{resizeHandle("summary")}
               </th>
               {ds.map((date) => (
                 <th
@@ -734,7 +740,11 @@ export function OperatingSheet({
                     onClick={() => onDate(date)}
                     title={`${date} 이벤트 기록`}
                   >
-                    <b>{Number(date.slice(-2))}</b>
+                    <b>
+                      {multiMonth && (date.endsWith("-01") || date === ds[0])
+                        ? `${Number(date.slice(5, 7))}/${Number(date.slice(-2))}`
+                        : Number(date.slice(-2))}
+                    </b>
                     <small>
                       {
                         ["일", "월", "화", "수", "목", "금", "토"][
@@ -1181,10 +1191,19 @@ export function OperatingSheet({
                       )}
                       {row &&
                         allowed(row, date) &&
-                        (row.metric?.mode === "ratio" ? (
+                        (row.metric && !row.content_id && studentRoles.includes(row.metric.funnel_role as StudentRole) && onStudents ? (
+                          <button
+                            className="student-cell"
+                            title={`${date} ${row.metric.name} 학생 명단`}
+                            aria-label={`${row.metric.name} ${date} 학생 명단`}
+                            onClick={() => onStudents(row.metric!, date)}
+                          >
+                            {cellValue(data, row, date).value ?? <span>＋</span>}
+                          </button>
+                        ) : row.metric?.mode === "ratio" ? (
                           <span className="derived">
                             {number(
-                              metricValue(data, row, { start: date, end: date })
+                              cellValue(data, row, date)
                                 .value,
                               row.metric.unit === "percent" ? "%" : "",
                             )}
@@ -1195,7 +1214,7 @@ export function OperatingSheet({
                             cellId={`${ri}:${di}`}
                             label={`${row.content_id ? data.contents.find((c) => c.id === row.content_id)?.title + " · " : ""}${row.promotion_id ? data.promotions.find((p) => p.id === row.promotion_id)?.title + " · " : ""}${r.label} ${date}`}
                             value={
-                              metricValue(data, row, { start: date, end: date })
+                              cellValue(data, row, date)
                                 .value
                             }
                             onSave={(raw) => onSave([change(row, date, raw)])}

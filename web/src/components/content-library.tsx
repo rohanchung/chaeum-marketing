@@ -14,14 +14,12 @@ import {
   isSearchKeyword,
   metricsForContent,
   money,
-  monthPeriod,
   number,
 } from "@/lib/domain";
 import {
   CSSProperties,
   Dispatch,
   SetStateAction,
-  useMemo,
   useState,
 } from "react";
 
@@ -29,7 +27,8 @@ type Lifecycle = "active" | "archive" | "trash";
 
 type Props = {
   data: Data;
-  month: string;
+  /** The header period: one month or a month range. */
+  period: Period;
   lifecycle: string;
   search: string;
   onLifecycle: (value: string) => void;
@@ -143,7 +142,7 @@ function displayValue(value: number | null, row: MetricRow | undefined) {
 
 export function ContentLibrary({
   data,
-  month,
+  period,
   lifecycle,
   search,
   onLifecycle,
@@ -155,7 +154,10 @@ export function ContentLibrary({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedMetrics, setSelectedMetrics] = useState<Record<string, string>>({});
-  const period = useMemo<Period>(() => monthPeriod(month), [month]);
+  const singleMonth = period.start.slice(0, 7) === period.end.slice(0, 7);
+  const periodLabel = singleMonth
+    ? `${period.start.slice(0, 4)}년 ${Number(period.start.slice(5, 7))}월`
+    : `${period.start.slice(0, 7).replace("-", ".")} ~ ${period.end.slice(0, 7).replace("-", ".")}`;
   const query = search.trim().toLocaleLowerCase("ko-KR");
   const groups = data.channels
     .filter((channel) => lifecycle === "trash" ? !!channel.deleted_at : !channel.deleted_at)
@@ -224,7 +226,7 @@ export function ContentLibrary({
         <div className="content-library-panel-head">
           <div>
             <h2>콘텐츠 운영 목록</h2>
-            <small>{month.replace("-", "년 ")}월 · 채널별 소재와 대표 지표</small>
+            <small>{periodLabel} · 채널별 소재와 대표 지표</small>
           </div>
           <span>{groups.reduce((total, group) => total + group.contents.length, 0)}개 소재</span>
         </div>
@@ -238,8 +240,8 @@ export function ContentLibrary({
                 <th>유형</th>
                 <th>발행·집행 기간</th>
                 <th>대표 지표</th>
-                <th>월간 값</th>
-                <th>{Number(month.slice(5))}월 비용</th>
+                <th>{singleMonth ? "월간 값" : "기간 값"}</th>
+                <th>{singleMonth ? `${Number(period.start.slice(5, 7))}월 비용` : "기간 비용"}</th>
                 <th aria-label="더보기" />
               </tr>
             </thead>

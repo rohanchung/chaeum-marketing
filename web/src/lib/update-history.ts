@@ -9,6 +9,18 @@ export type UpdateEntry = {
 // Newest first. Add one entry after each completed update; never rewrite old history.
 export const updateHistory: UpdateEntry[] = [
   {
+    id: "20261006-students-and-metric-options",
+    date: "2026-10-06",
+    title: "레벨테스트·등록 학생 명단과 지표 요약 기간 옵션",
+    room: "현재 제작방",
+    changes: [
+      "대시보드의 레벨테스트·신규 등록 칸을 누르면 그날 학생 명단(이름·학교·학년, 등록 시 이전 학원·월 수강료)을 기록하고, 칸 숫자는 명단 인원으로 저장됩니다.",
+      "분석의 학생·전환 탭에서 레벨테스트→등록 전환율, 재원·퇴원, 평균 근속 개월과 학생별 다닌 기간을 봅니다.",
+      "지표 설정에 요약 기간(기간 안에서만 / 기간 무관 누적)을 추가하고, 당근 단골수·쿠폰 발급수는 처음부터의 총합으로 보여 줍니다.",
+      "헤더에서 여러 달(연도 넘김 포함)을 골라 대시보드·콘텐츠·분석 요약을 묶어 볼 수 있습니다.",
+    ],
+  },
+  {
     id: "20261002-save-queue-timeout",
     date: "2026-10-02",
     title: "운영시트 저장 멈춤 방지",

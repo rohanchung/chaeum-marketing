@@ -28,7 +28,7 @@ export const titles: Partial<Record<Collection, string>> = {
   metrics: "지표",
   values: "비용 지표 금액",
   costs: "비용",
-  customers: "고객·전환",
+  customers: "학생·전환",
   payments: "결제·환불",
 };
 const sourceValue = (r: Record<string, unknown>) =>
@@ -319,6 +319,10 @@ export function Editor({
             metricScope === "funnel" && metricUnit === "count"
               ? nullable("funnel_role")
               : null,
+          aggregation_scope:
+            !rankMetric && metricMode !== "ratio" && get("aggregation_scope") === "lifetime"
+              ? "lifetime"
+              : null,
         };
       }
       if (collection === "costs") {
@@ -362,6 +366,11 @@ export function Editor({
           reference_code: get("reference_code"),
           consulted_on: get("consulted_on"),
           enrolled_on: enrolledOn,
+          level_test_on: nullable("level_test_on"),
+          student_name: nullable("student_name"),
+          school: nullable("school"),
+          grade: nullable("grade"),
+          previous_academy: nullable("previous_academy"),
           withdrawn_on: withdrawnOn,
           monthly_fee: monthlyFee,
           confidence: get("confidence"),
@@ -792,7 +801,26 @@ export function Editor({
                     <option value="">별도 기록만</option>
                     <option value="inflows">유입에 합산</option>
                     <option value="consultations">상담에 합산</option>
-                    <option value="enrollments">등록에 합산</option>
+                    <option value="level_tests">레벨테스트 · 칸을 누르면 학생 명단 기록</option>
+                    <option value="enrollments">등록에 합산 · 칸을 누르면 등록 학생 기록</option>
+                  </select>
+                </Field>
+              )}
+              {!rankMetric && metricMode !== "ratio" && (
+                <Field
+                  label="요약 기간"
+                  hint={
+                    metricScope === "funnel"
+                      ? "학원 퍼널은 보통 기간 안에서만 봅니다."
+                      : "단골수·쿠폰 발급수처럼 처음부터 계속 쌓이는 값은 ‘기간 무관’을 고르세요."
+                  }
+                >
+                  <select
+                    name="aggregation_scope"
+                    defaultValue={r.aggregation_scope === "lifetime" ? "lifetime" : "period"}
+                  >
+                    <option value="period">기간 안에서만 · 보고 있는 달(범위)의 값</option>
+                    <option value="lifetime">기간 무관 누적 · 처음 기록부터 보고 있는 기간 끝까지</option>
                   </select>
                 </Field>
               )}
@@ -816,7 +844,7 @@ export function Editor({
                 )}
               <p className="form-note">
                 {metricMode === "daily"
-                  ? "기간 합계: 일별 신규 수를 입력합니다. 1, 2, 1이면 월간 4입니다."
+                  ? "일별 신규 수를 입력합니다. 1, 2, 1이면 그 기간 4입니다. ‘기간 무관 누적’이면 처음부터 더한 총합을 보여 줍니다. 날짜 칸에는 언제나 그날 입력값만 보입니다."
                   : metricMode === "ratio"
                     ? "계산식: 분자·분모 지표의 현재 집계 방식에 따라 다시 계산합니다."
                     : "누적 총수·최근값: 날짜마다 확인한 전체 수를 입력합니다. 1, 2, 1이면 마지막 값 1입니다. 더하지 않습니다."}
@@ -965,12 +993,23 @@ export function Editor({
           )}
           {collection === "customers" && (
             <>
-              <Field
-                label="고객 참조번호"
-                hint="이름·전화번호 대신 학원에서 구분할 수 있는 번호를 사용하세요."
-              >
-                {input("reference_code", "text", true)}
-              </Field>
+              <div className="form-pair">
+                <Field label="학생 이름">{input("student_name")}</Field>
+                <Field label="참조번호" hint="학원에서 구분하는 번호. 비우면 자동으로 만듭니다.">
+                  {input("reference_code", "text", true, `S-${localDate().replaceAll("-", "")}-${String(r.id ?? crypto.randomUUID()).slice(0, 6)}`)}
+                </Field>
+              </div>
+              <div className="form-pair">
+                <Field label="학교">{input("school")}</Field>
+                <Field label="학년">{input("grade", "text", false, "", { list: "customer-grades", placeholder: "예: 중2" })}</Field>
+              </div>
+              <datalist id="customer-grades">
+                {["초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"].map((grade) => <option key={grade} value={grade} />)}
+              </datalist>
+              <div className="form-pair">
+                <Field label="레벨테스트일">{input("level_test_on", "date")}</Field>
+                <Field label="이전 학원">{input("previous_academy")}</Field>
+              </div>
               <div className="form-pair">
                 <Field label="최초 상담일">
                   {input("consulted_on", "date", true, localDate())}
